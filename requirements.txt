@@ -1,0 +1,7 @@
+python-dotenv
+git+https://github.com/MedicalSchoolHamburgBiomechLab/BiomechLabTools.git#egg=labtools
+matplotlib==3.7.1
+numpy
+pandas
+scipy
+seaborn
