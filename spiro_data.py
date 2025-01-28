@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import ruptures as rpt
@@ -67,10 +70,50 @@ def save_data_frame(df: pd.DataFrame):
 
 def get_change_points(signal: np.ndarray, penalty: int = 1750) -> np.ndarray:
     algo = rpt.Pelt(model="l2", min_size=90).fit(signal)
-    return np.array(algo.predict(pen=penalty))
+    return np.array(algo.predict(pen=penalty), dtype=int)
 
 
-def get_ends_of_bouts(data: pd.DataFrame) -> list[int]:
+def get_end_of_bout_json() -> dict:
+    filepath = get_end_of_bout_json_path()
+    if not filepath.exists():
+        return dict()
+    with open(filepath, "r") as file:
+        data = json.load(file)
+    return data
+
+
+def get_end_of_bout_json_path() -> Path:
+    path = get_spiro_path()
+    filename = "end_of_bout_times.json"
+    return path.joinpath(filename)
+
+
+def save_end_of_bout_json(data: dict):
+    # read the json file
+    file_data = get_end_of_bout_json()
+    _id = list(data.keys())[0]
+    if _id in file_data:
+        file_data[_id].update(data[_id])
+    else:
+        file_data.update(data)
+    path = get_end_of_bout_json_path()
+    with open(path, "w") as file:
+        json.dump(file_data, file, indent=4)
+
+
+def get_ends_of_bouts(data: pd.DataFrame,
+                      _id: str,
+                      shoe: str,
+                      from_file: bool = False) -> list[int]:
+    # from file:
+    if from_file:
+        data = get_end_of_bout_json()
+        if _id not in data:
+            raise ValueError(f"ID {_id} not found in data")
+        if shoe not in data[_id]:
+            raise ValueError(f"Shoe {shoe} not found in data")
+        return data[_id][shoe]
+
     # Convert t (s) to numeric seconds
     data['time_s'] = data['t (s)'].dt.total_seconds()
 
@@ -83,13 +126,17 @@ def get_ends_of_bouts(data: pd.DataFrame) -> list[int]:
     fifteen_minutes = 15 * 60
 
     expected_bouts = int(elapsed_time_s / fifteen_minutes)
-    change_points = get_change_points(interpolated_signal, 1750)
+    change_points = get_change_points(interpolated_signal, 1500)
 
     # now get only the n="expected_bouts" longest bouts
     change_points = np.insert(change_points, 0, 0)  # add 0 as the first change point (start of the signal)
     lengths = np.diff(change_points)
     longest, l_indices = find_k_largest_elements(lengths, expected_bouts)
     l_indices += 1
+    save_end_of_bout_json(
+        {_id: {shoe: [int(i) for i in change_points[l_indices]]}
+         }
+    )
     return list(change_points[l_indices])
 
 
@@ -106,24 +153,43 @@ def get_results(data: pd.DataFrame, t_end: int, params: list[str], duration: int
     return out
 
 
-def analyze(data: pd.DataFrame, params: list[str]) -> dict:
-    bout_ends = get_ends_of_bouts(data=data)
+def add_patch(ax: plt.Axes, time_point: int, patch_width_phase: int = 180):
+    patch_height = ax.get_ylim()[1]
+    x_patch_start_phase = time_point - patch_width_phase
+    patch_height = ax.get_ylim()[1]
+    ax.add_patch(plt.Rectangle((x_patch_start_phase, 0),
+                               patch_width_phase, patch_height, color='red', alpha=0.1))
+
+
+def analyze(data: pd.DataFrame,
+            _id: str,
+            shoe: str,
+            params: list[str]) -> tuple[dict, plt.figure]:
+    bout_ends = get_ends_of_bouts(data=data, _id=_id, shoe=shoe, from_file=True)
     results = dict()
+
+    plot_signal = "VO2/Kg (mL/min/Kg)"
+    fig, ax = plt.subplots(figsize=(16, 10))
+    time = data['t (s)'].dt.total_seconds().values
+    ax.plot(time, data[plot_signal])
     for n_bout, bout_end in enumerate(bout_ends, 1):
         if n_bout == 1:
             # additional analysis for the first bout from minute 2-5 ...
             t5 = bout_end - 600
             key = "T05"
             results[key] = get_results(data, t5, params=params)
+            add_patch(ax, t5)
             # ... and 7-10
             t10 = bout_end - 300
             key = "T10"
             results[key] = get_results(data, t10, params=params)
+            add_patch(ax, t10)
 
         key = f"T{str(n_bout * 15).zfill(2)}"
         results[key] = get_results(data, bout_end, params=params)
+        add_patch(ax, bout_end)
 
-    return results
+    return results, fig
 
 
 def add_economy(result: dict, body_weight_kg: float, running_speed_kmh: float) -> dict:
@@ -153,13 +219,14 @@ def main(params: list[str]):
         df = pd.DataFrame(columns=cols)
     for entry in path.glob("*DUR*"):  # only loop over directories that contain DUR in their name
         _id = entry.stem
+        print(_id)
         running_speed = df_summary.loc[df_summary['participant_id'] == _id, 'dauerbelastung_pace_kmh'].values[0]
         body_weight_pre = df_summary.loc[df_summary['participant_id'] == _id, 'weight_pre'].values[0]
         body_weight_post = df_summary.loc[df_summary['participant_id'] == _id, 'weight_post'].values[0]
         body_weight = (body_weight_pre + body_weight_post) / 2
         for folder in entry.glob("*AFT*"):
             shoe_condition = folder.stem
-            print(shoe_condition)
+            print(f"\t {shoe_condition}")
             excel_files = [f for f in folder.glob("*.xlsx")]
             if len(excel_files) != 1:
                 print(f"Expected exactly one excel file. Got {len(excel_files)} Skipping folder: {folder}")
@@ -168,7 +235,13 @@ def main(params: list[str]):
 
             data, meta = read_cosmed_excel(spiro_file)
 
-            results = analyze(data, params=params)
+            results, figure = analyze(data, _id=_id, shoe=shoe_condition, params=params)
+            # safe the figure
+            path_plot = path.joinpath("plots", "timeseries", f"{_id}_{shoe_condition}.png")
+            figure.suptitle(f"{_id} - {shoe_condition}")
+            figure.savefig(path_plot)
+            plt.close(figure)
+
             for time_condition, result in results.items():
                 # concatenate results to existing data frame
                 row_values = {
@@ -192,19 +265,48 @@ def main(params: list[str]):
 def analysis(params: list[SpiroParameter]):
     df = get_data_frame()
     for param in params:
-        fig = violin_plot_for_param(df, param)
-        filename = f"{param.safe_name}_violin_plot.png"
-        path_plot = get_spiro_path().joinpath("plots", filename)
+        # fig = violin_plot_for_param(df, param)
+        fig = line_plot_for_param(df, param)
+        filename = f"{param.safe_name}_line_plot.png"
+        path_plot = get_spiro_path().joinpath("plots", "parameters", filename)
         fig.savefig(path_plot)
 
+
+def line_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
+    print(param)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    palette = sns.color_palette("colorblind")
+    sns.set_palette(palette)
+    # add an offset to the time_min values to avoid overlapping of the error bars
+    dat = data.copy()
+    dat['time_min'] = dat['time_min'] + dat['shoe_condition'].apply(lambda x: 0 if x == 'AFT' else 0.5)
+
+    sns.lineplot(data=dat,
+                 x="time_min",
+                 y=param.column_name,
+                 hue="shoe_condition",
+                 markers=True,
+                 style="shoe_condition",
+                 errorbar="sd",
+                 err_style="bars",
+                 err_kws={"capsize": 5},
+                 ax=ax)
+    ax.set_xticks(np.arange(0, 100, 10))
+    fig.suptitle(f"{param.name}")
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+    fig.tight_layout()
+
+    return fig
 
 def violin_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
     fig, ax = plt.subplots(figsize=(16, 10))
     palette = sns.color_palette("colorblind")
     sns.set_palette(palette)
+
     sns.violinplot(data=data,
                    x="time_condition",
                    y=param.column_name,
+                   positions=[0, 1, 2, 5, 8, 11, 14, 17],
                    hue="shoe_condition",
                    split=True,
                    inner="quart",
@@ -238,7 +340,7 @@ if __name__ == '__main__':
         SpiroParameter(column_name='HF (bpm)', safe_name="heart_rate", name="Heart Rate"),
     ]
     params = [p.column_name for p in parameters]
-    main(params=params)
+    # main(params=params)
     parameters.extend(
         [SpiroParameter(column_name='energetic_cost_W_KG', safe_name="energetic_cost", name="Energetic Cost"),
          SpiroParameter(column_name='ecot_J_kg_m', safe_name="ecot", name="Energetic Cost of Transport")]
