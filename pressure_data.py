@@ -1,18 +1,11 @@
-import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from dotenv import load_dotenv
 from labtools.systems.zebris.spatio_temnporal_parameters import analyze
 
-
-def get_path_data_root():
-    load_dotenv()
-    path = Path(os.getenv("PATH_DATA_ROOT"))
-    assert path.exists()
-    return path
+from utils import get_path_data_root
 
 
 def get_pressure_path():
