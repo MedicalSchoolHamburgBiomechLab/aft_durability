@@ -44,7 +44,8 @@ def peronnet_massicotte_1991(v_o2: float, v_co2: float):
 
 def interpolate(signal: np.ndarray, time: np.ndarray, interval: float = 1) -> np.ndarray:
     # interpolate the signal to have a uniform time step
-    interpolated_signal = np.interp(np.arange(time[0], time[-1], interval), time, signal)
+    interpolated_signal = np.interp(
+        np.arange(time[0], time[-1], interval), time, signal)
     return interpolated_signal
 
 
@@ -129,7 +130,8 @@ def get_ends_of_bouts(data: pd.DataFrame,
     change_points = get_change_points(interpolated_signal, 1500)
 
     # now get only the n="expected_bouts" longest bouts
-    change_points = np.insert(change_points, 0, 0)  # add 0 as the first change point (start of the signal)
+    # add 0 as the first change point (start of the signal)
+    change_points = np.insert(change_points, 0, 0)
     lengths = np.diff(change_points)
     longest, l_indices = find_k_largest_elements(lengths, expected_bouts)
     l_indices += 1
@@ -144,7 +146,9 @@ def get_results(data: pd.DataFrame, t_end: int, params: list[str], duration: int
     # convert timedelta to seconds
     data['time_s'] = data['t (s)'].dt.total_seconds()
     # get the data for the bout
-    data_bout = data[(data['time_s'] >= t_end - duration) & (data['time_s'] <= t_end)]
+    data_bout = data[(data['time_s'] >= t_end - duration)
+                     & (data['time_s'] <= t_end)]
+
     out = dict()
     for param in params:
         if param not in data.columns:
@@ -165,8 +169,10 @@ def analyze(data: pd.DataFrame,
             _id: str,
             shoe: str,
             params: list[str]) -> tuple[dict, plt.figure]:
-    bout_ends = get_ends_of_bouts(data=data, _id=_id, shoe=shoe, from_file=True)
+    bout_ends = get_ends_of_bouts(
+        data=data, _id=_id, shoe=shoe, from_file=True)
     results = dict()
+    bout_ends = [int(b-15) for b in bout_ends]
 
     plot_signal = "VO2/Kg (mL/min/Kg)"
     fig, ax = plt.subplots(figsize=(16, 10))
@@ -187,6 +193,20 @@ def analyze(data: pd.DataFrame,
 
         key = f"T{str(n_bout * 15).zfill(2)}"
         results[key] = get_results(data, bout_end, params=params)
+
+        # fig2, ax2 = plt.subplots(figsize=(16, 10))
+        # bout_start = max((bout_end - 900), 0)
+        # roi_end = bout_end + 60
+
+        # ax2.plot(time[bout_start:roi_end],
+        #          data[plot_signal][bout_start:roi_end])
+
+        data_bout = data[(data['time_s'] >= bout_end - 180)
+                         & (data['time_s'] <= bout_end)]
+        # ax2.plot(data_bout["time_s"], data_bout[plot_signal],
+        #          color='red', linestyle='-')
+        # add_patch(ax2, bout_end)
+        ax.plot(data_bout["time_s"], data_bout[plot_signal], color='red')
         add_patch(ax, bout_end)
 
     return results, fig
@@ -202,7 +222,8 @@ def add_economy(result: dict, body_weight_kg: float, running_speed_kmh: float) -
         energetic_cost_kJ_s = peronnet_massicotte_1991(v_02, v_co2)
         energetic_cost_W_KG = energetic_cost_kJ_s * 1000 / body_weight_kg
         out['energetic_cost_W_KG'] = energetic_cost_W_KG
-        energetic_cost_of_transport = energetic_cost_W_KG / (running_speed_kmh / 3.6)
+        energetic_cost_of_transport = energetic_cost_W_KG / \
+            (running_speed_kmh / 3.6)
         out['ecot_J_kg_m'] = energetic_cost_of_transport
 
     return out
@@ -214,30 +235,38 @@ def main(params: list[str]):
     df_summary = get_demographics()
 
     if df is None:
-        cols = ["participant_id", "shoe_condition", "time_condition", "time_min"]
+        cols = ["participant_id", "shoe_condition",
+                "time_condition", "time_min"]
         cols.extend(params)
         df = pd.DataFrame(columns=cols)
-    for entry in path.glob("*DUR*"):  # only loop over directories that contain DUR in their name
+    # only loop over directories that contain DUR in their name
+    for entry in path.glob("*DUR*"):
         _id = entry.stem
         print(_id)
-        running_speed = df_summary.loc[df_summary['participant_id'] == _id, 'dauerbelastung_pace_kmh'].values[0]
-        body_weight_pre = df_summary.loc[df_summary['participant_id'] == _id, 'weight_pre'].values[0]
-        body_weight_post = df_summary.loc[df_summary['participant_id'] == _id, 'weight_post'].values[0]
+        running_speed = df_summary.loc[df_summary['participant_id']
+                                       == _id, 'dauerbelastung_pace_kmh'].values[0]
+        body_weight_pre = df_summary.loc[df_summary['participant_id']
+                                         == _id, 'weight_pre'].values[0]
+        body_weight_post = df_summary.loc[df_summary['participant_id']
+                                          == _id, 'weight_post'].values[0]
         body_weight = (body_weight_pre + body_weight_post) / 2
         for folder in entry.glob("*AFT*"):
             shoe_condition = folder.stem
             print(f"\t {shoe_condition}")
             excel_files = [f for f in folder.glob("*.xlsx")]
             if len(excel_files) != 1:
-                print(f"Expected exactly one excel file. Got {len(excel_files)} Skipping folder: {folder}")
+                print(
+                    f"Expected exactly one excel file. Got {len(excel_files)} Skipping folder: {folder}")
                 continue
             spiro_file = excel_files[0]
 
             data, meta = read_cosmed_excel(spiro_file)
 
-            results, figure = analyze(data, _id=_id, shoe=shoe_condition, params=params)
+            results, figure = analyze(
+                data, _id=_id, shoe=shoe_condition, params=params)
             # safe the figure
-            path_plot = path.joinpath("plots", "timeseries", f"{_id}_{shoe_condition}.png")
+            path_plot = path.joinpath(
+                "plots", "timeseries", f"{_id}_{shoe_condition}.png")
             figure.suptitle(f"{_id} - {shoe_condition}")
             figure.savefig(path_plot)
             plt.close(figure)
@@ -251,14 +280,22 @@ def main(params: list[str]):
                     "time_min": [int(time_condition[1:])],
 
                 }
-                row_values.update({k: v for k, v in result.items() if k in params})
+                row_values.update(
+                    {k: v for k, v in result.items() if k in params})
                 # add economy parameters
                 row_values.update(add_economy(result,
                                               body_weight_kg=body_weight,
                                               running_speed_kmh=running_speed))
 
                 new_row = pd.DataFrame(row_values)
+                # remove the existing row if it exists
+                df = df[~(
+                    (df["participant_id"] == _id) &
+                    (df["shoe_condition"] == shoe_condition) &
+                    (df["time_condition"] == time_condition)
+                )]
                 df = pd.concat([df, new_row], axis=0, ignore_index=True)
+
     save_data_frame(df)
 
 
@@ -279,7 +316,8 @@ def line_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
     sns.set_palette(palette)
     # add an offset to the time_min values to avoid overlapping of the error bars
     dat = data.copy()
-    dat['time_min'] = dat['time_min'] + dat['shoe_condition'].apply(lambda x: 0 if x == 'AFT' else 0.5)
+    dat['time_min'] = dat['time_min'] + \
+        dat['shoe_condition'].apply(lambda x: 0 if x == 'AFT' else 0.5)
 
     sns.lineplot(data=dat,
                  x="time_min",
@@ -297,6 +335,7 @@ def line_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
     fig.tight_layout()
 
     return fig
+
 
 def violin_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
     fig, ax = plt.subplots(figsize=(16, 10))
@@ -329,15 +368,36 @@ def violin_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
 
 if __name__ == '__main__':
     parameters = [
-        SpiroParameter(column_name='Af (1/min)', safe_name='breathing_rate', name="Breathing Rate"),
-        SpiroParameter(column_name='VE (L/min)', safe_name="ventilation", name="Ventilation"),
-        SpiroParameter(column_name='VO2 (mL/min)', safe_name="oxygen_consumption", name="Oxygen Consumption"),
-        SpiroParameter(column_name='VCO2 (mL/min)', safe_name="carbon_dioxide_production",
+        SpiroParameter(column_name='Af (1/min)',
+                       safe_name='breathing_rate',
+                       name="Breathing Rate"),
+        SpiroParameter(column_name='VE (L/min)',
+                       safe_name="ventilation",
+                       name="Ventilation"),
+        SpiroParameter(column_name='VT (L(btps))',
+                       safe_name="tidal_volume",
+                       name="Tidal Volume"),
+        SpiroParameter(column_name='VO2 (mL/min)',
+                       safe_name="oxygen_consumption",
+                       name="Oxygen Consumption"),
+        SpiroParameter(column_name='VCO2 (mL/min)',
+                       safe_name="carbon_dioxide_production",
                        name="Carbon Dioxide Production"),
-        SpiroParameter(column_name='R (---)', safe_name="rer", name="Respiratory Exchange Ratio"),
-        SpiroParameter(column_name='VO2/Kg (mL/min/Kg)', safe_name="oxygen_consumption_per_kg",
+        SpiroParameter(column_name='VE/VO2 (---)',
+                       safe_name="ventilatory_equivalent_oxygen",
+                       name="Ventilatory Equivalent Oxygen"),
+        SpiroParameter(column_name='VE/VCO2 (---)',
+                       safe_name="ventilatory_equivalent_carbon_dioxide",
+                       name="Ventilatory Equivalent Carbon Dioxide"),
+        SpiroParameter(column_name='R (---)',
+                       safe_name="rer",
+                       name="Respiratory Exchange Ratio"),
+        SpiroParameter(column_name='VO2/Kg (mL/min/Kg)',
+                       safe_name="oxygen_consumption_per_kg",
                        name="Oxygen Consumption per Kg"),
-        SpiroParameter(column_name='HF (bpm)', safe_name="heart_rate", name="Heart Rate"),
+        SpiroParameter(column_name='HF (bpm)',
+                       safe_name="heart_rate",
+                       name="Heart Rate"),
     ]
     params = [p.column_name for p in parameters]
     # main(params=params)
