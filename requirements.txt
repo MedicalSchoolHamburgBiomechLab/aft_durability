@@ -3,5 +3,6 @@ git+https://github.com/MedicalSchoolHamburgBiomechLab/BiomechLabTools.git#egg=la
 matplotlib==3.7.1
 numpy
 pandas
+ruptures
 scipy
 seaborn

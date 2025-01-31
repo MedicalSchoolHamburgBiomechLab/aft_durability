@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import seaborn as sns
 
@@ -83,6 +85,20 @@ def add_breath_step_ratio(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def get_merged_dataframe_path() -> Path:
+    return get_path_data_root().joinpath("merged_data.xlsx")
+
+
+def save_merged_dataframe(df: pd.DataFrame):
+    path = get_merged_dataframe_path()
+    df.to_excel(path, index=False)
+
+
+def load_merged_dataframe() -> pd.DataFrame:
+    path = get_merged_dataframe_path()
+    return pd.read_excel(path)
+
+
 def main():
     spiro_df = get_spiro_data_frame()
     pressure_df = get_pressure_data_frame()
@@ -98,7 +114,8 @@ def main():
     print(merged_df)
     # add ratio of breathing frequency and step rate to the merged dataframe
     # merged_df = add_breath_step_ratio(merged_df)
-    merged_df.to_excel(get_path_data_root().joinpath("merged_data.xlsx"), index=False)
+    # save the merged dataframe
+    save_merged_dataframe(merged_df)
     # make_plots(merged_df)
 
 
