@@ -15,9 +15,23 @@ def get_path_data_root():
 
 def get_demographics() -> pd.DataFrame:
     path = get_path_data_root()
-    filename = "Durability .xlsx"
+    filename = "Durability.xlsx"
     path = path.joinpath(filename)
     assert path.exists()
+    return pd.read_excel(path)
+
+
+def get_merged_dataframe_path() -> Path:
+    return get_path_data_root().joinpath("merged_data.xlsx")
+
+
+def save_merged_dataframe(df: pd.DataFrame):
+    path = get_merged_dataframe_path()
+    df.to_excel(path, index=False)
+
+
+def load_merged_dataframe() -> pd.DataFrame:
+    path = get_merged_dataframe_path()
     return pd.read_excel(path)
 
 

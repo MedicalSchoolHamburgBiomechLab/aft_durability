@@ -172,7 +172,7 @@ def analyze(data: pd.DataFrame,
     bout_ends = get_ends_of_bouts(
         data=data, _id=_id, shoe=shoe, from_file=True)
     results = dict()
-    bout_ends = [int(b-15) for b in bout_ends]
+    bout_ends = [int(b - 15) for b in bout_ends]
 
     plot_signal = "VO2/Kg (mL/min/Kg)"
     fig, ax = plt.subplots(figsize=(16, 10))
@@ -223,10 +223,26 @@ def add_economy(result: dict, body_weight_kg: float, running_speed_kmh: float) -
         energetic_cost_W_KG = energetic_cost_kJ_s * 1000 / body_weight_kg
         out['energetic_cost_W_KG'] = energetic_cost_W_KG
         energetic_cost_of_transport = energetic_cost_W_KG / \
-            (running_speed_kmh / 3.6)
+                                      (running_speed_kmh / 3.6)
         out['ecot_J_kg_m'] = energetic_cost_of_transport
+        # Add oxygen cost of transport in mL/kg/km
+        vO2_rel = result.get('VO2/Kg (mL/min/Kg)')
+        oxygen_cost_of_transport = vO2_rel * 60 / running_speed_kmh
+        out['ocot_mL_kg_km'] = oxygen_cost_of_transport
 
     return out
+
+
+def get_body_weight_estimate(body_weight_pre: float, body_weight_post: float, time_condition: str) -> float:
+    # body_weight_pre was measured at T-15 minutes (before incremental test)
+    # body_weight_post was measured at T+105 minutes (after incremental test)#
+    # body weight is assumed to decrease linearly between T-15 and T+105
+    time = int(time_condition[1:])
+
+    m = (body_weight_post - body_weight_pre) / 120
+    b = body_weight_pre
+
+    return m * (time + 15) + b
 
 
 def main(params: list[str]):
@@ -249,7 +265,6 @@ def main(params: list[str]):
                                          == _id, 'weight_pre'].values[0]
         body_weight_post = df_summary.loc[df_summary['participant_id']
                                           == _id, 'weight_post'].values[0]
-        body_weight = (body_weight_pre + body_weight_post) / 2
         for folder in entry.glob("*AFT*"):
             shoe_condition = folder.stem
             print(f"\t {shoe_condition}")
@@ -283,6 +298,9 @@ def main(params: list[str]):
                 row_values.update(
                     {k: v for k, v in result.items() if k in params})
                 # add economy parameters
+                # estimate body weight based on the weight loss from pre to post measurement
+                body_weight = get_body_weight_estimate(body_weight_pre, body_weight_post, time_condition)
+                print(f"Estimated body weight: {body_weight}")
                 row_values.update(add_economy(result,
                                               body_weight_kg=body_weight,
                                               running_speed_kmh=running_speed))
@@ -290,9 +308,9 @@ def main(params: list[str]):
                 new_row = pd.DataFrame(row_values)
                 # remove the existing row if it exists
                 df = df[~(
-                    (df["participant_id"] == _id) &
-                    (df["shoe_condition"] == shoe_condition) &
-                    (df["time_condition"] == time_condition)
+                        (df["participant_id"] == _id) &
+                        (df["shoe_condition"] == shoe_condition) &
+                        (df["time_condition"] == time_condition)
                 )]
                 df = pd.concat([df, new_row], axis=0, ignore_index=True)
 
@@ -317,7 +335,7 @@ def line_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
     # add an offset to the time_min values to avoid overlapping of the error bars
     dat = data.copy()
     dat['time_min'] = dat['time_min'] + \
-        dat['shoe_condition'].apply(lambda x: 0 if x == 'AFT' else 0.5)
+                      dat['shoe_condition'].apply(lambda x: 0 if x == 'AFT' else 0.5)
 
     sns.lineplot(data=dat,
                  x="time_min",
@@ -400,9 +418,9 @@ if __name__ == '__main__':
                        name="Heart Rate"),
     ]
     params = [p.column_name for p in parameters]
-    # main(params=params)
+    main(params=params)
     parameters.extend(
         [SpiroParameter(column_name='energetic_cost_W_KG', safe_name="energetic_cost", name="Energetic Cost"),
          SpiroParameter(column_name='ecot_J_kg_m', safe_name="ecot", name="Energetic Cost of Transport")]
     )
-    analysis(params=parameters)
+    # analysis(params=parameters)

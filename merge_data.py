@@ -1,11 +1,9 @@
-from pathlib import Path
-
 import pandas as pd
 import seaborn as sns
 
 from pressure_data import get_data_frame as get_pressure_data_frame
 from spiro_data import get_data_frame as get_spiro_data_frame
-from utils import get_path_data_root, get_demographics
+from utils import get_demographics, save_merged_dataframe
 
 
 def make_plots(df: pd.DataFrame):
@@ -83,20 +81,6 @@ def get_rpe_data_frame(df_demographics: pd.DataFrame) -> pd.DataFrame:
 def add_breath_step_ratio(df: pd.DataFrame) -> pd.DataFrame:
     df["steps_per_breath_ratio"] = df["steps_per_minute"] / df["Af (1/min)"]
     return df
-
-
-def get_merged_dataframe_path() -> Path:
-    return get_path_data_root().joinpath("merged_data.xlsx")
-
-
-def save_merged_dataframe(df: pd.DataFrame):
-    path = get_merged_dataframe_path()
-    df.to_excel(path, index=False)
-
-
-def load_merged_dataframe() -> pd.DataFrame:
-    path = get_merged_dataframe_path()
-    return pd.read_excel(path)
 
 
 def main():
