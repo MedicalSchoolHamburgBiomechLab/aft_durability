@@ -242,11 +242,64 @@ def make_box_plots(df: pd.DataFrame):
         fig.savefig(path_plot)
 
 
+def make_change_plot(df: pd.DataFrame):
+    def add_line_plot(data: pd.DataFrame,
+                      param,
+                      err_bar_position,
+                      marker_fill: bool):
+        means = data.groupby("time_min")[param].mean()
+        sds = data.groupby("time_min")[param].std()
+        mfc = 'w' if marker_fill else 'k'
+        plt.plot(means.index,
+                 means,
+                 color='k',
+                 marker="o",
+                 markerfacecolor=mfc,
+                 markersize=10,
+                 )
+        yerr = [np.zeros_like(sds), sds] if err_bar_position == 'top' else [sds, np.zeros_like(sds)]
+        plt.errorbar(means.index,
+                     means,
+                     yerr=yerr,
+                     fmt='none',
+                     capsize=5,
+                     color='k')
+
+    # filter out time points before T15
+    df = df[df["time_min"] >= 15]
+    data_aft = df[df["shoe_condition"] == "AFT"]
+    data_non_aft = df[df["shoe_condition"] == "NonAFT"]
+    param = "ocot_change_T15"
+
+    fig, ax = plt.subplots()
+    add_line_plot(data_non_aft,
+                  param,
+                  err_bar_position='bottom',
+                  marker_fill=True)
+    add_line_plot(data_aft,
+                  param,
+                  err_bar_position='top',
+                  marker_fill=False)
+    plt.axhline(0, color='k', linestyle='-')
+    for tick in df["time_min"].unique():
+        plt.plot([tick, tick],
+                 [-0.1, 0.1],
+                 color='k')
+    ax.set_xticks(df["time_min"].unique())
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.tick_params(bottom=False)
+    ax.set_ylabel("Change in oCoT (%)")
+    ax.set_ylim([-2, 10])
+
+
 def main():
     df = load_merged_dataframe()
-    print(df)
-    make_violin_plots(df)
+    # print(df)
+    # make_violin_plots(df)
     # make_box_plots(df)
+    make_change_plot(df)
 
 
 if __name__ == '__main__':

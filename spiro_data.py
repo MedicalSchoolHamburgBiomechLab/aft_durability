@@ -1,4 +1,5 @@
 import json
+from itertools import product
 from pathlib import Path
 
 import numpy as np
@@ -384,6 +385,37 @@ def violin_plot_for_param(data: pd.DataFrame, param: SpiroParameter):
     return fig
 
 
+def add_change_parameters():
+    path = get_spiro_path()
+    df = get_data_frame()
+    df_summary = get_demographics()
+    # add ecot and ocot changes
+    participants = df.participant_id.unique()
+    shoe_conditions = df.shoe_condition.unique()
+    for participant, shoe in product(participants, shoe_conditions):
+        print(participant, shoe)
+        params = ['ecot_J_kg_m', 'ocot_mL_kg_km']
+        new_param_names = ['ecot_change', 'ocot_change']
+        baseline_times = ['T05', 'T15']
+
+        for baseline_time, (param, new_param) in product(baseline_times, zip(params, new_param_names)):
+            print(param, new_param, baseline_time)
+            baseline_row = df.loc[
+                (df.participant_id == participant) & (df.time_condition == baseline_time) & (df.shoe_condition == shoe)]
+            if baseline_row.empty:
+                print(f"Baseline row not found for {participant} - {shoe}")
+                continue
+            param_baseline = baseline_row[param].values[0]
+            param_change = df.loc[(df.participant_id == participant) & (
+                        df.shoe_condition == shoe), param].values - param_baseline
+            param_change_oercent = param_change / param_baseline * 100
+            new_param_name = f"{new_param}_{baseline_time}"
+            df.loc[
+                (df.participant_id == participant) & (df.shoe_condition == shoe), new_param_name] = param_change_oercent
+    save_data_frame(df)
+
+
+
 if __name__ == '__main__':
     parameters = [
         SpiroParameter(column_name='Af (1/min)',
@@ -419,6 +451,7 @@ if __name__ == '__main__':
     ]
     params = [p.column_name for p in parameters]
     main(params=params)
+    add_change_parameters()
     parameters.extend(
         [SpiroParameter(column_name='energetic_cost_W_KG', safe_name="energetic_cost", name="Energetic Cost"),
          SpiroParameter(column_name='ecot_J_kg_m', safe_name="ecot", name="Energetic Cost of Transport")]
