@@ -249,7 +249,7 @@ def make_change_plot(df: pd.DataFrame):
                       marker_fill: bool):
         means = data.groupby("time_min")[param].mean()
         sds = data.groupby("time_min")[param].std()
-        mfc = 'w' if marker_fill else 'k'
+        mfc = 'k' if marker_fill else 'w'
         plt.plot(means.index,
                  means,
                  color='k',
@@ -275,11 +275,11 @@ def make_change_plot(df: pd.DataFrame):
     add_line_plot(data_non_aft,
                   param,
                   err_bar_position='bottom',
-                  marker_fill=True)
+                  marker_fill=False)
     add_line_plot(data_aft,
                   param,
                   err_bar_position='top',
-                  marker_fill=False)
+                  marker_fill=True)
     plt.axhline(0, color='k', linestyle='-')
     for tick in df["time_min"].unique():
         plt.plot([tick, tick],
