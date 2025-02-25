@@ -6,13 +6,20 @@ import pandas as pd
 from dotenv import load_dotenv
 
 
-def get_path_data_root():
+def get_path_data_root() -> Path:
     load_dotenv()
     path_env = os.getenv("PATH_DATA_ROOT")
     if path_env is None:
         raise ValueError("The environment variable PATH_DATA_ROOT is not set.")
     path = Path(path_env)
     assert path.exists()
+    return path
+
+
+def get_plot_path():
+    root = get_path_data_root()
+    path = root.joinpath("plots")
+    path.mkdir(exist_ok=True)
     return path
 
 

@@ -1,5 +1,5 @@
 python-dotenv
-git+https://github.com/MedicalSchoolHamburgBiomechLab/BiomechLabTools.git#egg=labtools
+git+https://github.com/MedicalSchoolHamburgBiomechLab/BiomechLabTools.git@v0.0.2#egg=labtools
 matplotlib==3.7.1
 numpy
 pandas
