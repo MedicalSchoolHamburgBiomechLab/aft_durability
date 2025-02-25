@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 
 def get_path_data_root():
     load_dotenv()
-    path = Path(os.getenv("PATH_DATA_ROOT"))
+    path_env = os.getenv("PATH_DATA_ROOT")
+    if path_env is None:
+        raise ValueError("The environment variable PATH_DATA_ROOT is not set.")
+    path = Path(path_env)
     assert path.exists()
     return path
 
