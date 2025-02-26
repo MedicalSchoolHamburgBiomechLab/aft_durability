@@ -265,12 +265,12 @@ def analyze(mat_file: Path, shoe_condition: str, participant_id: str) -> list[di
         # get the events from the pressure file
         events = get_pressure_events(pressure_file)
 
-        make_plots(data=kinematic_data,
-                   file_index=f,
-                   events=events,
-                   participant_id=participant_id,
-                   shoe_condition=shoe_condition,
-                   time_condition=time_condition)
+        # make_plots(data=kinematic_data,
+        #            file_index=f,
+        #            events=events,
+        #            participant_id=participant_id,
+        #            shoe_condition=shoe_condition,
+        #            time_condition=time_condition)
 
         params = get_params(data=kinematic_data, file_index=f, events=events)
         result = {
