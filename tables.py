@@ -5,6 +5,23 @@ from utils import load_merged_dataframe, get_path_data_root, get_demographics
 
 def make_param_table():
     df = load_merged_dataframe()
+    kinematics_columns = ["hip_peak_flexion_during_stance",
+                          "hip_flexion_at_initial_contact",
+                          "hip_flexion_rom_during_stance",
+                          "knee_peak_flexion_during_stance",
+                          "knee_flexion_at_initial_contact",
+                          "knee_flexion_rom_during_stance",
+                          "ankle_peak_flexion_during_stance",
+                          "ankle_flexion_at_initial_contact",
+                          "ankle_flexion_rom_during_stance",
+                          "overstriding_hip_cm",
+                          "overstriding_knee_cm",
+                          "overstriding_hip_deg",
+                          "overstriding_knee_deg",
+                          "vertical_pelvis_movement"]
+    spatio_temporal_columns = ['steps_per_minute',
+                               'contact_time_ms',
+                               'flight_time_ms']
     columns = ['VO2/Kg (mL/min/Kg)',
                'HF (bpm)',
                'energetic_cost_W_KG',
@@ -14,11 +31,10 @@ def make_param_table():
                'ocot_change_T05',
                'ecot_change_T15',
                'ocot_change_T15',
-               'steps_per_minute',
-               'contact_time_ms',
-               'flight_time_ms',
                'lactate',
                'rpe']
+    columns.extend(spatio_temporal_columns)
+    columns.extend(kinematics_columns)
 
     # Group by shoe_condition and time_condition
     grp = df.groupby(['shoe_condition', 'time_condition'])
@@ -49,8 +65,14 @@ def make_param_table():
     # Combine mean and std into "M ± STD"
     table_combined = table_means.copy()
     for col in table_means.columns:
+        print(col)
         table_combined[col] = table_means[col].combine(table_stds[col],
                                                        lambda m, s: f"{m:.2f} ± {s:.2f}")
+        # table_combined[col] = (
+        #         table_means[col].astype(float).map("{:.2f}".format)
+        #         + " ± " +
+        #         table_stds[col].astype(float).map("{:.2f}".format)
+        # )
 
     path = get_path_data_root().joinpath('tables')
     path.mkdir(exist_ok=True)

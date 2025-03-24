@@ -67,6 +67,11 @@ plot_params = [
         title="Flight Time",
         filename="flight_time_ms",
         unit="ms"),
+    PlottableParameter(
+        column_name="normalized_ground_contact_time",
+        title="Normalized Ground Contact Time",
+        filename="normalized_ground_contact_time",
+        unit=""),
     # Kinematic parameters
     # Pelvis
     PlottableParameter(
