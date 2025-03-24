@@ -71,6 +71,51 @@ plot_params = [
         column_name="flight_time_ms",
         title="Flight Time",
         unit="ms"),
+    # Kinematic parameters
+    # Pelvis
+    PlottableParameter(
+        column_name="vertical_pelvis_movement",
+        title="Vertical Pelvis Movement",
+        unit="cm"),
+    # Hip
+    PlottableParameter(
+        column_name="hip_peak_flexion_during_stance",
+        title="Hip Peak Flexion",
+        unit="°"),
+    PlottableParameter(
+        column_name="hip_flexion_at_initial_contact",
+        title="Hip Flexion at Initial Contact",
+        unit="°"),
+    PlottableParameter(
+        column_name="hip_flexion_rom_during_stance",
+        title="Hip Flexion ROM",
+        unit="°"),
+    # Knee
+    PlottableParameter(
+        column_name="knee_peak_flexion_during_stance",
+        title="Knee Peak Flexion",
+        unit="°"),
+    PlottableParameter(
+        column_name="knee_flexion_at_initial_contact",
+        title="Knee Flexion at Initial Contact",
+        unit="°"),
+    PlottableParameter(
+        column_name="knee_flexion_rom_during_stance",
+        title="Knee Flexion ROM",
+        unit="°"),
+    # Ankle
+    PlottableParameter(
+        column_name="ankle_peak_flexion_during_stance",
+        title="Ankle Peak Dorsiflexion",
+        unit="°"),
+    PlottableParameter(
+        column_name="ankle_flexion_at_initial_contact",
+        title="Ankle Dorsiflexion at Initial Contact",
+        unit="°"),
+    PlottableParameter(
+        column_name="ankle_flexion_rom_during_stance",
+        title="Ankle Dorsiflexion ROM",
+        unit="°"),
 ]
 
 # pairwise comparisons (T05...T90) from R (emmeans) for the following parameters:
@@ -297,9 +342,9 @@ def make_change_plot(df: pd.DataFrame):
 def main():
     df = load_merged_dataframe()
     # print(df)
-    # make_violin_plots(df)
+    make_violin_plots(df)
     # make_box_plots(df)
-    make_change_plot(df)
+    # make_change_plot(df)
 
 
 if __name__ == '__main__':

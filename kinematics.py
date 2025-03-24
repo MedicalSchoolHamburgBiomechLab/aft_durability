@@ -1,5 +1,6 @@
 import warnings
 from itertools import product
+from multiprocessing import Pool
 from pathlib import Path
 
 import matplotlib.pyplot as plt  # noqa
@@ -90,7 +91,9 @@ def get_time_condition_from_filename(mat_file_path: Path, shoe_condition: str, p
     # DUR02     NonAFT      T45                 missing
     if (particpant_id == "DUR02") & (shoe_condition == "NonAFT"):
         time_conditions_list.remove("T45")
-    return time_conditions_list[num_trial - 1]
+    tc = time_conditions_list[num_trial - 1]
+    print(f'num_trial: {num_trial} mapped to: {tc}')
+    return tc
 
 
 def get_get_vertical_pelvis_displacement(
@@ -138,8 +141,7 @@ def get_params(data: dict,
         convert_sample_rate(signal=data['Pelvis_COG'][file_index][0][:, 2],
                             f_in=85,
                             f_out=300),
-        events=events['right'],
-    )
+        events=events['right'])
     params = ['peak_flexion_during_stance', 'flexion_at_initial_contact', 'flexion_rom_during_stance']
     joints = ['Hip', 'Knee', 'Ankle']
     sides = ['Left', 'Right']
@@ -174,7 +176,7 @@ def get_params(data: dict,
     for param, value in results.items():
         results[param] = np.mean(list(value.values()))
 
-    results['vertical_pelvis_movement']: vertical_pelvis_movement
+    results['vertical_pelvis_movement'] = vertical_pelvis_movement * 100  # convert to cm
     return results
 
 
@@ -283,25 +285,40 @@ def analyze(mat_file: Path, shoe_condition: str, participant_id: str) -> list[di
     return out
 
 
-def main():
+def process_mat_file(args):
+    mat_file, shoe_condition, participant_id = args
+    return analyze(mat_file, shoe_condition, participant_id)
+
+
+def main(multi_process: bool = True):
     path = get_raw_path()
     df = pd.DataFrame()
-
-    for participant_dir in path.glob("*DUR*"):  # only loop over directories that contain DUR in their name
-        participant_id = participant_dir.stem
-        print(participant_id)
-        for shoe_dir in participant_dir.glob("*AFT*"):
-            shoe_condition = shoe_dir.stem
-            print(shoe_condition)
-            mat_files = [file for file in shoe_dir.glob("*.mat")]
-            for mat_file in mat_files:
-                results = analyze(mat_file, shoe_condition, participant_id)
-                for result in results:
-                    new_line = pd.DataFrame(result, index=[0])
-                    df = pd.concat([df, new_line], ignore_index=True, axis=0)
-    # save the data frame
+    if multi_process:
+        tasks = []
+        for participant_dir in path.glob("*DUR*"):
+            participant_id = participant_dir.stem
+            for shoe_dir in participant_dir.glob("*AFT*"):
+                shoe_condition = shoe_dir.stem
+                for mat_file in shoe_dir.glob("*.mat"):
+                    tasks.append((mat_file, shoe_condition, participant_id))
+        with Pool() as pool:
+            results = pool.map(process_mat_file, tasks)
+        for res in results:
+            for r in res:
+                df = pd.concat([df, pd.DataFrame(r, index=[0])], ignore_index=True, axis=0)
+    else:
+        for participant_dir in path.glob("*DUR*"):
+            participant_id = participant_dir.stem
+            print(participant_id)
+            for shoe_dir in participant_dir.glob("*AFT*"):
+                shoe_condition = shoe_dir.stem
+                print(shoe_condition)
+                for mat_file in shoe_dir.glob("*.mat"):
+                    results = analyze(mat_file, shoe_condition, participant_id)
+                    for result in results:
+                        df = pd.concat([df, pd.DataFrame(result, index=[0])], ignore_index=True, axis=0)
     save_data_frame(df)
 
 
 if __name__ == '__main__':
-    main()
+    main(multi_process=True)
