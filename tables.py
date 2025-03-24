@@ -21,7 +21,8 @@ def make_param_table():
                           "vertical_pelvis_movement"]
     spatio_temporal_columns = ['steps_per_minute',
                                'contact_time_ms',
-                               'flight_time_ms']
+                               'flight_time_ms',
+                               "normalized_ground_contact_time"]
     columns = ['VO2/Kg (mL/min/Kg)',
                'HF (bpm)',
                'energetic_cost_W_KG',

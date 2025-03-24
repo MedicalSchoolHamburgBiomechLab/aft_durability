@@ -160,6 +160,26 @@ asterisks = {
     "steps_per_minute": ["*", "*", "*", "*", "*", "", "", ""],
     "contact_time_ms": ["*", "*", "*", "*", "*", "", "", ""],
     "flight_time_ms": ["*", "*", "*", "*", "*", "", "", ""],
+    "normalized_ground_contact_time": ["*", "*", "*", "*", "*", "", "", ""],
+
+    "hip_peak_flexion_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
+    "hip_flexion_at_initial_contact": ["*", "*", "*", "*", "*", "*", "*", ""],
+    "hip_flexion_rom_during_stance": ["", "", "", "", "", "", "", ""],
+
+    "knee_peak_flexion_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
+    "knee_flexion_at_initial_contact": ["*", "*", "*", "*", "*", "*", "*", "*"],
+    "knee_flexion_rom_during_stance": ["", "", "", "", "", "", "", ""],
+
+    "ankle_peak_flexion_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
+    "ankle_flexion_at_initial_contact": ["*", "*", "*", "*", "*", "*", "*", "*"],
+    "ankle_flexion_rom_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
+
+    "overstriding_hip_cm": ["*", "*", "*", "", "", "", "", ""],
+    "overstriding_knee_cm": ["", "", "*", "*", "*", "*", "*", "*"],
+
+    "overstriding_hip_deg": ["", "", "", "*", "*", "*", "*", "*"],
+    "overstriding_knee_deg": ["*", "*", "*", "*", "*", "*", "*", "*"],
+    "vertical_pelvis_movement": ["*", "*", "*", "*", "", "", "", ""],
 }
 
 
