@@ -187,31 +187,34 @@ def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
 
 
 def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.Figure:
-    # exclude the first two time conditions for these plots ("T05" and "T10")
-    # data = data[~data["time_condition"].isin(["T05", "T10"])]
+    data = data.copy()
+    # Replace missing time_condition values and force string type
+    data["time_condition"] = data["time_condition"].fillna("").astype(str)
 
-    # fig, ax = plt.subplots(figsize=(16, 10))
-    fig, ax = plt.subplots()
-    markers = {"AFT": "s",  # square
-               "NonAFT": "D"}  # diamond
+    fig, ax = plt.subplots(figsize=(10, 6))
+    markers = {"AFT": "s", "NonAFT": "D"}
     light_grey = (0.7, 0.7, 0.7)
     darker_grey = (0.4, 0.4, 0.4)
-    palette_violin = {"AFT": light_grey,
-                      "NonAFT": darker_grey}
+    palette_violin = {"AFT": light_grey, "NonAFT": darker_grey}
+    gs = 0.3
+    palette_line = {"AFT": (gs, gs, gs), "NonAFT": (gs, gs, gs)}
 
-    sns.violinplot(data=data,
-                   x="time_condition",
-                   y=param.column_name,
-                   hue="shoe_condition",
-                   split=True,
-                   inner="quart",
-                   palette=palette_violin,
-                   ax=ax)
+    sns.violinplot(
+        data=data,
+        x="time_condition",
+        y=param.column_name,
+        hue="shoe_condition",
+        split=True,
+        inner="quart",
+        palette=palette_violin,
+        ax=ax
+    )
 
-    gs = 0.3  # grascale value
-    palette_line = {"AFT": (gs, gs, gs),
-                    "NonAFT": (gs, gs, gs)}
-    # First plot the line without markers
+    # Compute means per time_condition and shoe_condition, dropping missing values
+    means = (data.dropna(subset=["time_condition", param.column_name])
+             .groupby(["time_condition", "shoe_condition"])[param.column_name]
+             .mean().reset_index())
+
     sns.lineplot(
         data=data,
         x="time_condition",
@@ -221,47 +224,51 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.
         palette=palette_line,
         errorbar=None,
         linewidth=2,
-        ax=ax)
+        ax=ax
+    )
 
-    # Then add scatter points with custom colors for each category
-    custom_marker_colors = {"AFT": (0.1, 0.2, 0.5), "NonAFT": (0.8, 0.3, 0.2)}
-    for cond, group in data.groupby("shoe_condition"):
+    # Overlay scatter points using the same grayscale as in the violin plot
+    for _, row in means.iterrows():
         ax.scatter(
-            group["time_condition"],
-            group[param.column_name],
-            color=custom_marker_colors[cond],
-            marker=markers[cond],
-            s=64  # marker size
+            row["time_condition"],
+            row[param.column_name],
+            color=palette_violin[row["shoe_condition"]],
+            marker=markers[row["shoe_condition"]],
+            s=100,
+            edgecolor="black",  # set border color
+            linewidths=2
         )
-    # remove legend
+
+    # Remove legend and adjust spines
     ax.get_legend().remove()
-    # display only left and bottom borders
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    # try to add asterisks to the plot
+    # Instead of plt.text with numeric x-values, use the actual tick positions.
     asterisks_param = asterisks.get(param.column_name)
     if asterisks_param is not None:
-        y_position = ax.get_ylim()[-1]
+        xticks = ax.get_xticks()  # numeric positions for each category
+        # Get sorted unique time_condition labels in order of appearance on the axis
+        xticklabels = ax.get_xticklabels()
+        # Use the center of each tick label for the asterisk position
         for idx, pval in enumerate(asterisks_param):
-            plt.text(x=idx, y=y_position, s=pval)
+            if idx < len(xticks):
+                ax.text(
+                    xticks[idx],
+                    ax.get_ylim()[-1],
+                    s=pval,
+                    ha="center",
+                    va="bottom"
+                )
     else:
         print(f"No asterisks for {param.column_name}")
 
-    if param.unit:
-        # ax.set_ylabel(f"{param.title} ({param.unit})")
-        ax.set_ylabel(param.unit)
-    else:
-        ax.set_ylabel(f"{param.title}")
+    # Set labels and title
     ax.set_xlabel("Time (min)")
+    ax.set_ylabel(param.unit if param.unit else param.title)
     fig.suptitle(f"{param.title}")
 
     fig.tight_layout()
-
-    # manually rename the x tick labels:
-    xtl = ax.get_xticklabels()
-    # ax.set_xticklabels([int(lab.get_text()[1:]) for lab in xtl])
-
     return fig
 
 
