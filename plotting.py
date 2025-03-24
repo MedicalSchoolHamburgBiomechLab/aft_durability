@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -8,26 +9,12 @@ import seaborn as sns
 from utils import get_path_data_root, load_merged_dataframe
 
 
+@dataclass
 class PlottableParameter:
-    def __init__(self, title: str,
-                 column_name: str,
-                 unit: str = None,
-                 ):
-        self._title = title
-        self._column_name = column_name
-        self._unit = unit
-
-    @property
-    def title(self):
-        return self._title
-
-    @property
-    def column_name(self):
-        return self._column_name
-
-    @property
-    def unit(self):
-        return self._unit
+    title: str
+    column_name: str
+    filename: str
+    unit: str = None
 
 
 def get_plot_path() -> Path:
@@ -38,84 +25,123 @@ plot_params = [
     PlottableParameter(
         column_name="ecot_J_kg_m",
         title="ECOT",
+        filename="ecot_J_kg_m",
         unit="J/kg/m"),
     PlottableParameter(
         column_name="ocot_mL_kg_km",
         title="oCoT",
+        filename="ocot_mL_kg_km",
         unit="mL/kg/km"),
     PlottableParameter(
         column_name="energetic_cost_W_KG",
         title="Energetic Cost",
+        filename="energetic_cost_W_KG",
         unit="W/kg"),
     PlottableParameter(
         column_name="VO2/Kg (mL/min/Kg)",
         title="Oxygen Uptake",
+        filename="VO2_Kg",
         unit="mL/min/kg"),
     PlottableParameter(
         column_name="lactate",
         title="Lactate",
+        filename="lactate",
         unit="mmol/L"),
     PlottableParameter(
         column_name="rpe",
+        filename="rpe",
         title="RPE (Borg)"
     ),
     PlottableParameter(
         column_name="steps_per_minute",
         title="Step Rate",
+        filename="steps_per_minute",
         unit="steps/min"),
     PlottableParameter(
         column_name="contact_time_ms",
         title="Contact Time",
+        filename="contact_time_ms",
         unit="ms"),
     PlottableParameter(
         column_name="flight_time_ms",
         title="Flight Time",
+        filename="flight_time_ms",
         unit="ms"),
     # Kinematic parameters
     # Pelvis
     PlottableParameter(
         column_name="vertical_pelvis_movement",
         title="Vertical Pelvis Movement",
+        filename="vertical_pelvis_movement",
         unit="cm"),
     # Hip
     PlottableParameter(
         column_name="hip_peak_flexion_during_stance",
         title="Hip Peak Flexion",
+        filename="hip_peak_flexion_during_stance",
         unit="°"),
     PlottableParameter(
         column_name="hip_flexion_at_initial_contact",
         title="Hip Flexion at Initial Contact",
+        filename="hip_flexion_at_initial_contact",
         unit="°"),
     PlottableParameter(
         column_name="hip_flexion_rom_during_stance",
         title="Hip Flexion ROM",
+        filename="hip_flexion_rom_during_stance",
         unit="°"),
     # Knee
     PlottableParameter(
         column_name="knee_peak_flexion_during_stance",
         title="Knee Peak Flexion",
+        filename="knee_peak_flexion_during_stance",
         unit="°"),
     PlottableParameter(
         column_name="knee_flexion_at_initial_contact",
         title="Knee Flexion at Initial Contact",
+        filename="knee_flexion_at_initial_contact",
         unit="°"),
     PlottableParameter(
         column_name="knee_flexion_rom_during_stance",
         title="Knee Flexion ROM",
+        filename="knee_flexion_rom_during_stance",
         unit="°"),
     # Ankle
     PlottableParameter(
         column_name="ankle_peak_flexion_during_stance",
         title="Ankle Peak Dorsiflexion",
+        filename="ankle_peak_flexion_during_stance",
         unit="°"),
     PlottableParameter(
         column_name="ankle_flexion_at_initial_contact",
         title="Ankle Dorsiflexion at Initial Contact",
+        filename="ankle_flexion_at_initial_contact",
         unit="°"),
     PlottableParameter(
         column_name="ankle_flexion_rom_during_stance",
         title="Ankle Dorsiflexion ROM",
+        filename="ankle_flexion_rom_during_stance",
         unit="°"),
+    PlottableParameter(
+        column_name="overstriding_hip_cm",
+        title="Overstriding Hip",
+        filename="overstriding_hip_cm",
+        unit="cm"),
+    PlottableParameter(
+        column_name="overstriding_hip_deg",
+        title="Overstriding Hip",
+        filename="overstriding_hip_deg",
+        unit="°"),
+    PlottableParameter(
+        column_name="overstriding_knee_cm",
+        title="Overstriding Knee",
+        filename="overstriding_knee_cm",
+        unit="cm"),
+    PlottableParameter(
+        column_name="overstriding_knee_deg",
+        title="Overstriding Knee",
+        filename="overstriding_knee_deg",
+        unit="°")
 ]
 
 # pairwise comparisons (T05...T90) from R (emmeans) for the following parameters:
@@ -168,6 +194,10 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.
     fig, ax = plt.subplots()
     markers = {"AFT": "s",  # square
                "NonAFT": "D"}  # diamond
+    light_grey = (0.7, 0.7, 0.7)
+    darker_grey = (0.4, 0.4, 0.4)
+    palette_violin = {"AFT": light_grey,
+                      "NonAFT": darker_grey}
 
     sns.violinplot(data=data,
                    x="time_condition",
@@ -175,25 +205,34 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.
                    hue="shoe_condition",
                    split=True,
                    inner="quart",
-                   palette={"AFT": (0.4, 0.4, 0.4),
-                            "NonAFT": (0.7, 0.7, 0.7)},
+                   palette=palette_violin,
                    ax=ax)
 
     gs = 0.3  # grascale value
+    palette_line = {"AFT": (gs, gs, gs),
+                    "NonAFT": (gs, gs, gs)}
+    # First plot the line without markers
     sns.lineplot(
         data=data,
         x="time_condition",
         y=param.column_name,
         hue="shoe_condition",
         style="shoe_condition",
-        markers=markers,
-        palette={"AFT": (gs, gs, gs),
-                 "NonAFT": (gs, gs, gs)},
+        palette=palette_line,
         errorbar=None,
         linewidth=2,
-        markersize=8,
-        ax=ax
-    )
+        ax=ax)
+
+    # Then add scatter points with custom colors for each category
+    custom_marker_colors = {"AFT": (0.1, 0.2, 0.5), "NonAFT": (0.8, 0.3, 0.2)}
+    for cond, group in data.groupby("shoe_condition"):
+        ax.scatter(
+            group["time_condition"],
+            group[param.column_name],
+            color=custom_marker_colors[cond],
+            marker=markers[cond],
+            s=64  # marker size
+        )
     # remove legend
     ax.get_legend().remove()
     # display only left and bottom borders
@@ -231,7 +270,7 @@ def make_violin_plots(df: pd.DataFrame):
     path.mkdir(exist_ok=True)
     for param in plot_params:
         fig = violin_plot_for_param(df, param)
-        path_plot = path.joinpath(f"{param.title}.png")
+        path_plot = path.joinpath(f"{param.filename}.png")
         fig.savefig(path_plot)
 
 

@@ -134,6 +134,85 @@ def get_standing_trial_index(filename_array: np.ndarray) -> int:
     return index
 
 
+def get_overstriding(signals: dict, events: dict, file_index: int) -> dict:
+    ap_axis_index = 0
+    vert_axis_index = 2
+    out = dict()
+    for side in ['Left', 'Right']:
+        out[side] = dict()
+        signal_hip_pos_ap = convert_sample_rate(
+            signal=signals[f'{side}_Thigh_ProxEndPos'][file_index][0][:, ap_axis_index],
+            f_in=85,
+            f_out=300)
+
+        signal_knee_pos_ap = convert_sample_rate(
+            signal=signals[f'{side}_Shank_ProxEndPos'][file_index][0][:, ap_axis_index],
+            f_in=85,
+            f_out=300)
+        signal_ankle_pos_ap = convert_sample_rate(
+            signal=signals[f'{side}_Foot_ProxEndPos'][file_index][0][:, ap_axis_index],
+            f_in=85,
+            f_out=300)
+
+        signal_hip_pos_vert = convert_sample_rate(
+            signal=signals[f'{side}_Thigh_ProxEndPos'][file_index][0][:, vert_axis_index],
+            f_in=85,
+            f_out=300)
+        signal_knee_pos_vert = convert_sample_rate(
+            signal=signals[f'{side}_Shank_ProxEndPos'][file_index][0][:, vert_axis_index],
+            f_in=85,
+            f_out=300)
+        signal_ankle_pos_vert = convert_sample_rate(
+            signal=signals[f'{side}_Foot_ProxEndPos'][file_index][0][:, vert_axis_index],
+            f_in=85,
+            f_out=300)
+
+        overstriding_hip_cm = list()
+        overstriding_knee_cm = list()
+        overstriding_hip_deg = list()
+        overstriding_knee_deg = list()
+
+        for ic in events[side.lower()]['ic']:
+            hip_ap = signal_hip_pos_ap[ic]
+            offset_ap = hip_ap
+            hip_ap -= offset_ap
+            knee_ap = signal_knee_pos_ap[ic]
+            knee_ap -= offset_ap
+            ankle_ap = signal_ankle_pos_ap[ic]
+            ankle_ap -= offset_ap
+
+            hip_vert = signal_hip_pos_vert[ic]
+            offset_vert = hip_vert
+            hip_vert -= offset_vert
+            knee_vert = signal_knee_pos_vert[ic]
+            knee_vert -= offset_vert
+            ankle_vert = signal_ankle_pos_vert[ic]
+            ankle_vert -= offset_vert
+
+            # hip = ax.scatter(hip_ap, hip_vert, color='red')
+            # knee = ax.scatter(knee_ap, knee_vert, color='blue')
+            # ankle = ax.scatter(ankle_ap, ankle_vert, color='green')
+
+            # Calculate overstriding in cm
+            os_hip_m = (ankle_ap - hip_ap)
+            overstriding_hip_cm.append(os_hip_m * 100)  # convert to cm
+            os_knee_m = (ankle_ap - knee_ap)
+            overstriding_knee_cm.append(os_knee_m * 100)  # convert to cm
+            # Calculate overstriding in degrees
+            os_hip_deg = np.arctan(os_hip_m / (ankle_vert - hip_vert)) * 180 / np.pi * (-1)
+            overstriding_hip_deg.append(os_hip_deg)
+            os_knee_deg = np.arctan(os_knee_m / (ankle_vert - knee_vert)) * 180 / np.pi * (-1)
+            overstriding_knee_deg.append(os_knee_deg)
+        out[side] = {'overstriding_hip_cm': np.mean(overstriding_hip_cm),
+                     'overstriding_knee_cm': np.mean(overstriding_knee_cm),
+                     'overstriding_hip_deg': np.mean(overstriding_hip_deg),
+                     'overstriding_knee_deg': np.mean(overstriding_knee_deg)}
+
+    average = {key: (out['Left'][key] + out['Right'][key]) / 2 for key in out['Left']}
+
+    return average
+
+
 def get_params(data: dict,
                file_index: int,
                events: dict) -> dict:
@@ -171,10 +250,15 @@ def get_params(data: dict,
                 signal=signal,
                 ic_events=events[side.lower()]['ic'],
                 tc_events=events[side.lower()]['tc'])
-
     # summarize the sided parameters
     for param, value in results.items():
         results[param] = np.mean(list(value.values()))
+
+    # Calculate overstriding:
+    dict_overstriding = get_overstriding(signals=data,
+                                         events=events,
+                                         file_index=file_index)
+    results.update(dict_overstriding)
 
     results['vertical_pelvis_movement'] = vertical_pelvis_movement * 100  # convert to cm
     return results

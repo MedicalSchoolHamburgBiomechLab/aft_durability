@@ -38,7 +38,7 @@ def get_merged_dataframe_path() -> Path:
 def save_merged_dataframe(df: pd.DataFrame):
     path = get_merged_dataframe_path()
     # add datetime stamp to the file name
-    path = path.parent.joinpath(path.stem + "_" + pd.Timestamp.now().strftime("%Y%m%d_%H%M%S") + path.suffix)
+    # path = path.parent.joinpath(pd.Timestamp.now().strftime("%Y%m%d_%H%M%S") + "_" + path.stem + path.suffix)
     df.to_excel(path, index=False)
 
 
