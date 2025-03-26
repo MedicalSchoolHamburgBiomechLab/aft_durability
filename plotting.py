@@ -150,37 +150,7 @@ plot_params = [
 ]
 
 # pairwise comparisons (T05...T90) from R (emmeans) for the following parameters:
-asterisks = {
-    "ecot_J_kg_m": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "ocot_mL_kg_km": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "energetic_cost_W_KG": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "lactate": ["", "", "", "", "", "", "", ""],
-    "VO2/Kg (mL/min/Kg)": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "rpe": ["", "", "*", "*", "*", "*", "", ""],
-    "steps_per_minute": ["*", "*", "*", "*", "*", "", "", ""],
-    "contact_time_ms": ["*", "*", "*", "*", "*", "", "", ""],
-    "flight_time_ms": ["*", "*", "*", "*", "*", "", "", ""],
-    "normalized_ground_contact_time": ["*", "*", "*", "*", "*", "", "", ""],
-
-    "hip_peak_flexion_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "hip_flexion_at_initial_contact": ["*", "*", "*", "*", "*", "*", "*", ""],
-    "hip_flexion_rom_during_stance": ["", "", "", "", "", "", "", ""],
-
-    "knee_peak_flexion_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "knee_flexion_at_initial_contact": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "knee_flexion_rom_during_stance": ["", "", "", "", "", "", "", ""],
-
-    "ankle_peak_flexion_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "ankle_flexion_at_initial_contact": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "ankle_flexion_rom_during_stance": ["*", "*", "*", "*", "*", "*", "*", "*"],
-
-    "overstriding_hip_cm": ["*", "*", "*", "", "", "", "", ""],
-    "overstriding_knee_cm": ["", "", "*", "*", "*", "*", "*", "*"],
-
-    "overstriding_hip_deg": ["", "", "", "*", "*", "*", "*", "*"],
-    "overstriding_knee_deg": ["*", "*", "*", "*", "*", "*", "*", "*"],
-    "vertical_pelvis_movement": ["*", "*", "*", "*", "", "", "", ""],
-}
+asterisks = pd.read_excel(get_path_data_root().joinpath("results_pwc.xlsx"), index_col=0)
 
 
 def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
@@ -211,10 +181,17 @@ def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
     return fig
 
 
-def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.Figure:
+def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_participants: bool = False) -> plt.Figure:
     data = data.copy()
+    # only return those rows there the column_name is not NaN
+    data = data.dropna(subset=[param.column_name])
     # Replace missing time_condition values and force string type
     data["time_condition"] = data["time_condition"].fillna("").astype(str)
+
+
+    if 'T01' in data["time_condition"].unique():
+        time_order = ['T01', 'T03', 'T05', 'T07', 'T10', 'T15', 'T30', 'T45', 'T60', 'T75', 'T90']
+        data["time_condition"] = pd.Categorical(data["time_condition"], categories=time_order, ordered=True)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     markers = {"AFT": "s", "NonAFT": "D"}
@@ -240,17 +217,30 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.
              .groupby(["time_condition", "shoe_condition"])[param.column_name]
              .mean().reset_index())
 
-    sns.lineplot(
-        data=data,
-        x="time_condition",
-        y=param.column_name,
-        hue="shoe_condition",
-        style="shoe_condition",
-        palette=palette_line,
-        errorbar=None,
-        linewidth=2,
-        ax=ax
-    )
+    if plot_participants:
+        sns.lineplot(
+            data=data,
+            hue="participant_id",
+            style="shoe_condition",
+            x="time_condition",
+            y=param.column_name,
+            estimator=None,
+            ax=ax
+        )
+    else:
+        sns.lineplot(
+            data=data,
+            x="time_condition",
+            y=param.column_name,
+            hue="shoe_condition",
+            style="shoe_condition",
+            # estimator=None,
+            palette=palette_line,
+            # units="participant_id",
+            errorbar=None,
+            linewidth=2,
+            ax=ax
+        )
 
     # Overlay scatter points using the same grayscale as in the violin plot
     for _, row in means.iterrows():
@@ -270,7 +260,19 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.
     ax.spines['top'].set_visible(False)
 
     # Instead of plt.text with numeric x-values, use the actual tick positions.
-    asterisks_param = asterisks.get(param.column_name)
+    # asterisks_param = asterisks["Parameter"] == param.column_name
+    try:
+        asterisks_param = asterisks.loc[param.column_name]
+    except Exception as e:
+        print(e)
+        if param.column_name == "VO2/Kg (mL/min/Kg)":
+            asterisks_param = asterisks.loc["VO2_Kg__mL_min_Kg_"]
+        else:
+
+            foo = 1
+    if len(ax.get_xticks()) == 8:
+        asterisks_param.drop(["p_T01", "p_T03", "p_T07"], inplace=True)
+    asterisks_param = list(asterisks_param.apply(lambda x: "*" if x == "<0.001" else "").values)
     if asterisks_param is not None:
         xticks = ax.get_xticks()  # numeric positions for each category
         # Get sorted unique time_condition labels in order of appearance on the axis
@@ -297,13 +299,19 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter) -> plt.
     return fig
 
 
-def make_violin_plots(df: pd.DataFrame):
+def make_violin_plots(df: pd.DataFrame, plot_participants: bool = False):
     path = get_plot_path().joinpath("violin_plots")
     path.mkdir(exist_ok=True)
     for param in plot_params:
-        fig = violin_plot_for_param(df, param)
+        print(f"Plotting: {param}")
+        fig = violin_plot_for_param(df, param, plot_participants=plot_participants)
         path_plot = path.joinpath(f"{param.filename}.png")
+        if plot_participants:
+            path_plot = path.joinpath("participants")
+            path_plot.mkdir(exist_ok=True)
+            path_plot = path_plot.joinpath(f"{param.filename}_participants.png")
         fig.savefig(path_plot)
+        plt.close()
 
 
 def make_box_plot(df: pd.DataFrame, param: PlottableParameter):
@@ -413,7 +421,7 @@ def make_change_plot(df: pd.DataFrame):
 def main():
     df = load_merged_dataframe()
     # print(df)
-    make_violin_plots(df)
+    make_violin_plots(df, plot_participants=True)
     # make_box_plots(df)
     # make_change_plot(df)
 

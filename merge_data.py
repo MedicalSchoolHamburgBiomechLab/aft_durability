@@ -94,11 +94,21 @@ def main():
     df_rpe = get_rpe_data_frame(df_demographics)
 
     # merge dataframe on participant_id, shoe_condition, and time_condition
-    merged_df = pd.merge(df_spiro, df_pressure, on=["participant_id", "shoe_condition", "time_condition", "time_min"])
-    merged_df = pd.merge(merged_df, df_kinematics, on=["participant_id", "shoe_condition", "time_condition"])
-    merged_df = pd.merge(merged_df, df_lactate, on=["participant_id", "shoe_condition", "time_condition"], how="left")
-    merged_df = pd.merge(merged_df, df_rpe, on=["participant_id", "shoe_condition", "time_condition"], how="left")
-    print(merged_df)
+    merged_df = pd.merge(df_spiro, df_pressure,
+                         on=["participant_id", "shoe_condition", "time_condition", "time_min"],
+                         how="outer")
+    merged_df = pd.merge(merged_df, df_kinematics,
+                         on=["participant_id", "shoe_condition", "time_condition"],
+                         how="outer")
+    merged_df = pd.merge(merged_df, df_lactate,
+                         on=["participant_id", "shoe_condition", "time_condition"],
+                         how="outer")
+    merged_df = pd.merge(merged_df, df_rpe,
+                         on=["participant_id", "shoe_condition", "time_condition"],
+                         how="outer")
+    participant_excluded = ['DUR08', 'DUR11']
+    merged_df = merged_df[~merged_df["participant_id"].isin(participant_excluded)]
+
     # add ratio of breathing frequency and step rate to the merged dataframe
     # merged_df = add_breath_step_ratio(merged_df)
     # save the merged dataframe
