@@ -1,6 +1,7 @@
 import pandas as pd
 import seaborn as sns
 
+from kinematics import get_data_frame as get_kinematics_data_frame
 from pressure_data import get_data_frame as get_pressure_data_frame
 from spiro_data import get_data_frame as get_spiro_data_frame
 from utils import get_demographics, save_merged_dataframe
@@ -84,18 +85,30 @@ def add_breath_step_ratio(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    spiro_df = get_spiro_data_frame()
-    pressure_df = get_pressure_data_frame()
+    df_spiro = get_spiro_data_frame()
+    df_pressure = get_pressure_data_frame()
+    df_kinematics = get_kinematics_data_frame()
 
     df_demographics = get_demographics()
     df_lactate = get_lactate_data_frame(df_demographics)
     df_rpe = get_rpe_data_frame(df_demographics)
 
     # merge dataframe on participant_id, shoe_condition, and time_condition
-    merged_df = pd.merge(spiro_df, pressure_df, on=["participant_id", "shoe_condition", "time_condition", "time_min"])
-    merged_df = pd.merge(merged_df, df_lactate, on=["participant_id", "shoe_condition", "time_condition"], how="left")
-    merged_df = pd.merge(merged_df, df_rpe, on=["participant_id", "shoe_condition", "time_condition"], how="left")
-    print(merged_df)
+    merged_df = pd.merge(df_spiro, df_pressure,
+                         on=["participant_id", "shoe_condition", "time_condition", "time_min"],
+                         how="outer")
+    merged_df = pd.merge(merged_df, df_kinematics,
+                         on=["participant_id", "shoe_condition", "time_condition"],
+                         how="outer")
+    merged_df = pd.merge(merged_df, df_lactate,
+                         on=["participant_id", "shoe_condition", "time_condition"],
+                         how="outer")
+    merged_df = pd.merge(merged_df, df_rpe,
+                         on=["participant_id", "shoe_condition", "time_condition"],
+                         how="outer")
+    participant_excluded = ['DUR08', 'DUR11']
+    merged_df = merged_df[~merged_df["participant_id"].isin(participant_excluded)]
+
     # add ratio of breathing frequency and step rate to the merged dataframe
     # merged_df = add_breath_step_ratio(merged_df)
     # save the merged dataframe

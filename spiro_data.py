@@ -64,6 +64,14 @@ def get_data_frame() -> pd.DataFrame | None:
     return pd.read_excel(file_path)
 
 
+def get_kinematics_data_frame() -> pd.DataFrame:
+    path = get_spiro_path()
+    file_path = path.joinpath("kinematics_results.xlsx")
+    if not file_path.exists():
+        return None
+    return pd.read_excel(file_path)
+
+
 def save_data_frame(df: pd.DataFrame):
     path = get_spiro_path()
     path = path.joinpath("spiro_results.xlsx")

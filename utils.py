@@ -6,10 +6,20 @@ import pandas as pd
 from dotenv import load_dotenv
 
 
-def get_path_data_root():
+def get_path_data_root() -> Path:
     load_dotenv()
-    path = Path(os.getenv("PATH_DATA_ROOT"))
+    path_env = os.getenv("PATH_DATA_ROOT")
+    if path_env is None:
+        raise ValueError("The environment variable PATH_DATA_ROOT is not set.")
+    path = Path(path_env)
     assert path.exists()
+    return path
+
+
+def get_plot_path():
+    root = get_path_data_root()
+    path = root.joinpath("plots")
+    path.mkdir(exist_ok=True)
     return path
 
 
@@ -27,6 +37,8 @@ def get_merged_dataframe_path() -> Path:
 
 def save_merged_dataframe(df: pd.DataFrame):
     path = get_merged_dataframe_path()
+    # add datetime stamp to the file name
+    # path = path.parent.joinpath(pd.Timestamp.now().strftime("%Y%m%d_%H%M%S") + "_" + path.stem + path.suffix)
     df.to_excel(path, index=False)
 
 
