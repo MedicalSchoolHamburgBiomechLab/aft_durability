@@ -53,6 +53,11 @@ plot_params = [
         title="RPE (Borg)"
     ),
     PlottableParameter(
+        column_name="HF (bpm)",
+        filename="heartrate",
+        title="HF (bpm)"
+    ),
+    PlottableParameter(
         column_name="steps_per_minute",
         title="Step Rate",
         filename="steps_per_minute",
@@ -150,7 +155,7 @@ plot_params = [
 ]
 
 # pairwise comparisons (T05...T90) from R (emmeans) for the following parameters:
-asterisks = pd.read_excel(get_path_data_root().joinpath("results_pwc.xlsx"), index_col=0)
+asterisks = pd.read_excel(get_path_data_root().joinpath("results_pwc_shoe.xlsx"), index_col=0)
 
 
 def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
@@ -267,12 +272,17 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
         print(e)
         if param.column_name == "VO2/Kg (mL/min/Kg)":
             asterisks_param = asterisks.loc["VO2_Kg__mL_min_Kg_"]
+        elif param.column_name == "HF (bpm)":
+            asterisks_param = asterisks.loc["HF__bpm_"]
         else:
-
+            print('Parameter Column Name Mistmatch!')
             foo = 1
     if len(ax.get_xticks()) == 8:
         asterisks_param.drop(["p_T01", "p_T03", "p_T07"], inplace=True)
-    asterisks_param = list(asterisks_param.apply(lambda x: "*" if x == "<0.001" else "").values)
+    elif len(ax.get_xticks()) == 6:
+        asterisks_param.drop(["p_T01", "p_T03", "p_T05", "p_T07", "p_T10"], inplace=True)
+    asterisks_param = list(asterisks_param.apply(lambda x: "*" if x <= 0.05 else "").values)
+    assert (len(asterisks_param) == len(ax.get_xticks()))
     if asterisks_param is not None:
         xticks = ax.get_xticks()  # numeric positions for each category
         # Get sorted unique time_condition labels in order of appearance on the axis
@@ -421,7 +431,7 @@ def make_change_plot(df: pd.DataFrame):
 def main():
     df = load_merged_dataframe()
     # print(df)
-    make_violin_plots(df, plot_participants=True)
+    make_violin_plots(df, plot_participants=False)
     # make_box_plots(df)
     # make_change_plot(df)
 
