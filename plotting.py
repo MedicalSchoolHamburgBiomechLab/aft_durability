@@ -58,6 +58,12 @@ plot_params = [
         title="HF (bpm)"
     ),
     PlottableParameter(
+        column_name="Af (1/min)",
+        filename="respiratory_rate",
+        title="RF (1/min)"
+    ),
+    # biomechanical parameters
+    PlottableParameter(
         column_name="steps_per_minute",
         title="Step Rate",
         filename="steps_per_minute",
@@ -193,7 +199,6 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
     # Replace missing time_condition values and force string type
     data["time_condition"] = data["time_condition"].fillna("").astype(str)
 
-
     if 'T01' in data["time_condition"].unique():
         time_order = ['T01', 'T03', 'T05', 'T07', 'T10', 'T15', 'T30', 'T45', 'T60', 'T75', 'T90']
         data["time_condition"] = pd.Categorical(data["time_condition"], categories=time_order, ordered=True)
@@ -274,6 +279,8 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
             asterisks_param = asterisks.loc["VO2_Kg__mL_min_Kg_"]
         elif param.column_name == "HF (bpm)":
             asterisks_param = asterisks.loc["HF__bpm_"]
+        elif param.column_name == "Af (1/min)":
+            asterisks_param = asterisks.loc["Af__1_min_"]
         else:
             print('Parameter Column Name Mistmatch!')
             foo = 1
@@ -313,6 +320,8 @@ def make_violin_plots(df: pd.DataFrame, plot_participants: bool = False):
     path = get_plot_path().joinpath("violin_plots")
     path.mkdir(exist_ok=True)
     for param in plot_params:
+        if "respiratory_rate" not in param.filename:
+            continue
         print(f"Plotting: {param}")
         fig = violin_plot_for_param(df, param, plot_participants=plot_participants)
         path_plot = path.joinpath(f"{param.filename}.png")
