@@ -101,6 +101,7 @@ def make_demographics_table():
     df.loc[:, 'bmi'] = df['weight_pre'] / (df['height'] / 100) ** 2
 
     columns.remove('sex')
+    columns.extend(['bmi'])
     # Get total means and stds
     table_means_total = df[columns].mean()
     table_stds_total = df[columns].std()
