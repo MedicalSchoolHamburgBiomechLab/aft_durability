@@ -5,6 +5,20 @@ from utils import load_merged_dataframe, get_path_data_root, get_demographics
 
 def make_param_table():
     df = load_merged_dataframe()
+    physiological_columns = ['VO2/Kg (mL/min/Kg)',
+                             'HF (bpm)',
+                             'energetic_cost_W_KG',
+                             'ecot_J_kg_m',
+                             'ocot_mL_kg_km',
+                             'R (---)',
+                             'VE (L/min)',
+                             'Af (1/min)',
+                             'ecot_change_T05',
+                             'ocot_change_T05',
+                             'ecot_change_T15',
+                             'ocot_change_T15',
+                             'lactate',
+                             'rpe']
     kinematics_columns = ["hip_peak_flexion_during_stance",
                           "hip_flexion_at_initial_contact",
                           "hip_flexion_rom_during_stance",
@@ -23,17 +37,7 @@ def make_param_table():
                                'contact_time_ms',
                                'flight_time_ms',
                                "normalized_ground_contact_time"]
-    columns = ['VO2/Kg (mL/min/Kg)',
-               'HF (bpm)',
-               'energetic_cost_W_KG',
-               'ecot_J_kg_m',
-               'ocot_mL_kg_km',
-               'ecot_change_T05',
-               'ocot_change_T05',
-               'ecot_change_T15',
-               'ocot_change_T15',
-               'lactate',
-               'rpe']
+    columns = physiological_columns.copy()
     columns.extend(spatio_temporal_columns)
     columns.extend(kinematics_columns)
 
@@ -89,16 +93,51 @@ def make_demographics_table():
     df_demo = df_demo[(df_demo['participant_id'] != 'DUR11') & (df_demo['participant_id'] != 'DUR08')]
     # only take values of the first session
     df_demo = df_demo[(df_demo['session_nr'] == 1)]
-    columns = ['age', 'height', 'weight_pre', "dauerbelastung_pace_kmh", 'WA_max']
+    df_demo.rename(columns={"sex ": "sex"}, inplace=True)
+
+    columns = ['age', 'height', 'weight_pre', 'sex', 'dauerbelastung_pace_kmh', 'WA_max']
 
     df = df_demo[columns]
     df.loc[:, 'bmi'] = df['weight_pre'] / (df['height'] / 100) ** 2
-    df_summary = df.describe().T[['mean', 'std', 'min', 'max']]
+
+    columns.remove('sex')
+    # Get total means and stds
+    table_means_total = df[columns].mean()
+    table_stds_total = df[columns].std()
+    # Get sex specific means and stds
+    grp = df.groupby(['sex'])
+    table_means = grp.mean(numeric_only=True)[columns].T
+    table_stds = grp.std(numeric_only=True)[columns].T
+
+    # Combine the detailed and aggregated tables
+    table_means_total = pd.DataFrame(table_means_total)
+    table_means_total.columns = ['Total']
+    table_stds_total = pd.DataFrame(table_stds_total)
+    table_stds_total.columns = ['Total']
+
+    table_means = pd.concat([table_means, table_means_total], axis=1)
+    table_stds = pd.concat([table_stds, table_stds_total], axis=1)
+
+    # Combine mean and std into "M ± STD"
+    table_combined = table_means.copy()
+    for col in table_means.columns:
+        print(col)
+        table_combined[col] = table_means[col].combine(table_stds[col],
+                                                       lambda m, s: f"{m:.2f} ± {s:.2f}")
+
     path = get_path_data_root().joinpath('tables')
     path.mkdir(exist_ok=True)
-    df_summary.to_excel(path.joinpath('demographics_table.xlsx'))
+    with pd.ExcelWriter(path.joinpath('demographics_table.xlsx')) as writer:
+        table_combined.to_excel(writer, sheet_name='combined')
+        table_means.to_excel(writer, sheet_name='means')
+        table_stds.to_excel(writer, sheet_name='stds')
+
+    # df_summary = df.describe().T[['mean', 'std', 'min', 'max']]
+    # path = get_path_data_root().joinpath('tables')
+    # path.mkdir(exist_ok=True)
+    # df_summary.to_excel(path.joinpath('demographics_table.xlsx'))
 
 
 if __name__ == '__main__':
-    make_param_table()
+    # make_param_table()
     make_demographics_table()
