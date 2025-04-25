@@ -31,7 +31,7 @@ plot_params = [
         unit="J/kg/m"),
     PlottableParameter(
         column_name="ocot_mL_kg_km",
-        title="oCoT",
+        title="OCOT",
         filename="ocot_mL_kg_km",
         unit="mL/kg/km"),
     PlottableParameter(
@@ -64,6 +64,16 @@ plot_params = [
         filename="respiratory_rate",
         title="RF (1/min)"
     ),
+    PlottableParameter(
+        column_name="R (---)",
+        filename="rer",
+        title="Respiratory Rate",
+    ),
+    PlottableParameter(
+        column_name="VE (L/min)",
+        filename="ventilation",
+        title="Ventilation",
+        unit="L/min"),
     # biomechanical parameters
     PlottableParameter(
         column_name="steps_per_minute",
@@ -283,6 +293,10 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
             asterisks_param = asterisks.loc["HF__bpm_"]
         elif param.column_name == "Af (1/min)":
             asterisks_param = asterisks.loc["Af__1_min_"]
+        elif param.column_name == "R (---)":
+            asterisks_param = asterisks.loc["R______"]
+        elif param.column_name == "VE (L/min)":
+            asterisks_param = asterisks.loc["VE__L_min_"]
         else:
             print('Parameter Column Name Mistmatch!')
             foo = 1
@@ -393,13 +407,7 @@ def make_change_plot(df: pd.DataFrame):
         means = data.groupby("time_min")[param].mean()
         sds = data.groupby("time_min")[param].std()
         mfc = 'k' if marker_fill else 'w'
-        plt.plot(means.index,
-                 means,
-                 color='k',
-                 marker="o",
-                 markerfacecolor=mfc,
-                 markersize=10,
-                 )
+
         yerr = [np.zeros_like(sds), sds] if err_bar_position == 'top' else [sds, np.zeros_like(sds)]
         plt.errorbar(means.index,
                      means,
@@ -407,12 +415,21 @@ def make_change_plot(df: pd.DataFrame):
                      fmt='none',
                      capsize=5,
                      color='k')
+        plt.plot(means.index,
+                 means,
+                 color='k',
+                 marker="o",
+                 markerfacecolor=mfc,
+                 markersize=10,
+                 )
 
     # filter out time points before T15
     df = df[df["time_min"] >= 15]
     data_aft = df[df["shoe_condition"] == "AFT"]
     data_non_aft = df[df["shoe_condition"] == "NonAFT"]
+
     param = "ocot_change_T15"
+    ylabel = "Change in OCOT (%)"
 
     fig, ax = plt.subplots()
     add_line_plot(data_non_aft,
@@ -433,8 +450,9 @@ def make_change_plot(df: pd.DataFrame):
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.tick_params(bottom=False)
-    ax.set_ylabel("Change in oCoT (%)")
+    ax.set_ylabel(ylabel)
     ax.set_ylim([-2, 10])
+    fig.savefig(get_plot_path().joinpath(f"{param}.png"))
 
 
 def format_p_value(p_value: float, abbreviate_non_sig: bool = False) -> str:
@@ -569,8 +587,8 @@ def main():
     # print(df)
     # make_violin_plots(df, plot_participants=False)
     # make_box_plots(df)
-    # make_change_plot(df)
-    make_corr_matrix(df, overlay='combined')
+    make_change_plot(df)
+    # make_corr_matrix(df, overlay='combined')
 
 
 if __name__ == '__main__':

@@ -139,6 +139,24 @@ def make_demographics_table():
     # df_summary.to_excel(path.joinpath('demographics_table.xlsx'))
 
 
+def make_keb_table():
+    path_keb = get_path_data_root().joinpath("keb.xlsx")
+    df_keb = pd.read_excel(path_keb)
+    df_keb.drop(columns=['period'], inplace=True)
+    df_mean = df_keb.groupby('shoe_condition').mean(numeric_only=True).T
+    df_std = df_keb.groupby('shoe_condition').std(numeric_only=True).T
+    df_combined = df_mean.copy()
+    for col in df_mean.columns:
+        print(col)
+        df_combined[col] = df_mean[col].combine(df_std[col],
+                                                lambda m, s: f"{m:.2f} ± {s:.2f}")
+
+    path_out = get_path_data_root().joinpath('tables').joinpath('keb_summary.xlsx')
+    path_out.parent.mkdir(exist_ok=True)
+    df_combined.to_excel(path_out, sheet_name='combined')
+
+
 if __name__ == '__main__':
     # make_param_table()
-    make_demographics_table()
+    # make_demographics_table()
+    make_keb_table()
