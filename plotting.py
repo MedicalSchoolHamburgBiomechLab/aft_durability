@@ -204,7 +204,10 @@ def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
     return fig
 
 
-def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_participants: bool = False) -> plt.Figure:
+def violin_plot_for_param(data: pd.DataFrame,
+                          param: PlottableParameter,
+                          plot_participants: bool = False,
+                          show_title: bool = False) -> plt.Figure:
     data = data.copy()
     # only return those rows there the column_name is not NaN and where time_min is greater or equal to 15
     data = data.dropna(subset=[param.column_name]).query("time_min >= 15")
@@ -326,7 +329,13 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
     # Set labels and title
     ax.set_xlabel("Time (min)")
     ax.set_ylabel(param.unit if param.unit else param.title)
-    fig.suptitle(f"{param.title}")
+    if show_title:
+        fig.suptitle(f"{param.title}")
+
+    # Adjust x-ticks: replace the T in front of the time condition with an empty string
+    x_ticks = ax.get_xticklabels()
+    x_ticks = [tick.get_text().replace("T", "") for tick in x_ticks]
+    ax.set_xticklabels(x_ticks)
 
     fig.tight_layout()
     return fig
@@ -399,7 +408,12 @@ def make_box_plots(df: pd.DataFrame):
         fig.savefig(path_plot)
 
 
-def make_change_plot(df: pd.DataFrame):
+def make_change_plots(df: pd.DataFrame):
+    make_change_plot(df, param="ocot_change_T15", ylabel="Change in OCOT (%)")
+    make_change_plot(df, param="ecot_change_T15", ylabel="Change in ECOT (%)")
+
+
+def make_change_plot(df: pd.DataFrame, param: str, ylabel: str):
     def add_line_plot(data: pd.DataFrame,
                       param,
                       err_bar_position,
@@ -428,9 +442,6 @@ def make_change_plot(df: pd.DataFrame):
     data_aft = df[df["shoe_condition"] == "AFT"]
     data_non_aft = df[df["shoe_condition"] == "NonAFT"]
 
-    param = "ocot_change_T15"
-    ylabel = "Change in OCOT (%)"
-
     fig, ax = plt.subplots()
     add_line_plot(data_non_aft,
                   param,
@@ -450,8 +461,15 @@ def make_change_plot(df: pd.DataFrame):
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.tick_params(bottom=False)
+    ax.set_xlabel("Time (min)")
     ax.set_ylabel(ylabel)
     ax.set_ylim([-2, 10])
+    plt.legend(
+        ["NonAFT", "AFT"],
+        loc='upper left',
+        frameon=False,
+        fontsize=12
+    )
     fig.savefig(get_plot_path().joinpath(f"{param}.png"))
 
 
@@ -585,9 +603,9 @@ def make_corr_matrix(df: pd.DataFrame, overlay: str = 'combined'):
 def main():
     df = load_merged_dataframe()
     # print(df)
-    # make_violin_plots(df, plot_participants=False)
+    make_violin_plots(df, plot_participants=False)
     # make_box_plots(df)
-    make_change_plot(df)
+    # make_change_plots(df)
     # make_corr_matrix(df, overlay='combined')
 
 
