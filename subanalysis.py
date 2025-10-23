@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from utils import get_path_data_root
+from utils import get_path_data_root, load_merged_dataframe
 
 
 def get_path_subanalysis_root() -> Path:
@@ -252,9 +252,27 @@ def make_plots():
     )
 
 
+def plot_step_rate_resp_freq_ratio():
+    df = load_merged_dataframe()
+    df['step_rate_resp_freq_ratio'] = df['steps_per_minute'] / df['Af (1/min)']
+    df = df.loc[(df['time_condition'] != "T03") & (df['time_condition'] != "T07") & (df['time_condition'] != "T01")]
+    fig, ax = plt.subplots(figsize=(12, 8))
+    sns.barplot(
+        data=df,
+        x='time_condition',
+        y='step_rate_resp_freq_ratio',
+        hue='shoe_condition',
+        ax=ax
+    )
+    ax.set_ylabel("Step Rate / Respiratory Frequency")
+    ax.set_xlabel("")
+    plt.show()
+
+
 def main():
-    make_long_format_data_frames()
-    make_plots()
+    # make_long_format_data_frames()
+    # make_plots()
+    plot_step_rate_resp_freq_ratio()
 
 
 if __name__ == '__main__':
