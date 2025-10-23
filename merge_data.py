@@ -4,7 +4,7 @@ import seaborn as sns
 from kinematics import get_data_frame as get_kinematics_data_frame
 from pressure_data import get_data_frame as get_pressure_data_frame
 from spiro_data import get_data_frame as get_spiro_data_frame
-from utils import get_demographics, save_merged_dataframe
+from utils import get_demographics, get_path_data_root
 
 
 def make_plots(df: pd.DataFrame):
@@ -79,12 +79,43 @@ def get_rpe_data_frame(df_demographics: pd.DataFrame) -> pd.DataFrame:
     return df_rpe_long
 
 
+def get_keb_dataframe(df_demographics: pd.DataFrame) -> pd.DataFrame:
+    keb_columns = [
+        # Erholungsabfragen: Hoch = Gut
+        "körperliche_leistungsfähigkeit",
+        "mentale_leistungsfähigkeit",
+        "emotionale_ausgeglichenheit",
+        "allgemeiner_erholungsstatus",
+        # Belastungsabfragen: Niedrig = Gut
+        "muskuläre_beanspruchung",
+        "aktivierungsmangel",
+        "emotionale unausgeglichenheit",
+        "allgemeiner_beanspruchungszustand",
+    ]
+    shoe_condition_col = 'session_shoe'
+    participant_id_col = 'participant_id'
+    order_col = 'session_nr'
+    cols = [participant_id_col, shoe_condition_col, order_col] + keb_columns
+    df_keb = df_demographics[cols]
+    df_keb = correct_shoe_column(df_keb)
+    df_keb.rename(columns={order_col: "period"}, inplace=True)
+    # df_keb_long = pd.melt(df_keb, id_vars=[participant_id_col, "shoe_condition"], value_vars=keb_columns,
+    #                       var_name="time_condition", value_name="keb")
+    # df_keb_long = correct_time_condition_column(df_keb_long)
+    # summarize the keb columns over all participants and for each shoe condition
+    df_keb_mean = df_keb.groupby("shoe_condition").mean(numeric_only=True).T
+    df_keb_std = df_keb.groupby("shoe_condition").std(numeric_only=True).T
+    return df_keb
+
+
 def add_breath_step_ratio(df: pd.DataFrame) -> pd.DataFrame:
     df["steps_per_breath_ratio"] = df["steps_per_minute"] / df["Af (1/min)"]
     return df
 
 
 def main():
+    participant_excluded = ['DUR08', 'DUR11']
+
     df_spiro = get_spiro_data_frame()
     df_pressure = get_pressure_data_frame()
     df_kinematics = get_kinematics_data_frame()
@@ -92,6 +123,7 @@ def main():
     df_demographics = get_demographics()
     df_lactate = get_lactate_data_frame(df_demographics)
     df_rpe = get_rpe_data_frame(df_demographics)
+
 
     # merge dataframe on participant_id, shoe_condition, and time_condition
     merged_df = pd.merge(df_spiro, df_pressure,
@@ -106,14 +138,19 @@ def main():
     merged_df = pd.merge(merged_df, df_rpe,
                          on=["participant_id", "shoe_condition", "time_condition"],
                          how="outer")
-    participant_excluded = ['DUR08', 'DUR11']
     merged_df = merged_df[~merged_df["participant_id"].isin(participant_excluded)]
 
     # add ratio of breathing frequency and step rate to the merged dataframe
     # merged_df = add_breath_step_ratio(merged_df)
     # save the merged dataframe
-    save_merged_dataframe(merged_df)
+    # save_merged_dataframe(merged_df)
     # make_plots(merged_df)
+
+    df_keb = get_keb_dataframe(df_demographics)
+    df_keb = df_keb[~df_keb['participant_id'].isin(participant_excluded)]
+    # save the keb dataframe
+    path_keb = get_path_data_root().joinpath("keb.xlsx")
+    df_keb.to_excel(path_keb, index=False)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pingouin as pg
 import seaborn as sns
+from scipy.stats import pearsonr
 
 from utils import get_path_data_root, load_merged_dataframe
 
@@ -29,7 +31,7 @@ plot_params = [
         unit="J/kg/m"),
     PlottableParameter(
         column_name="ocot_mL_kg_km",
-        title="oCoT",
+        title="OCOT",
         filename="ocot_mL_kg_km",
         unit="mL/kg/km"),
     PlottableParameter(
@@ -52,6 +54,27 @@ plot_params = [
         filename="rpe",
         title="RPE (Borg)"
     ),
+    PlottableParameter(
+        column_name="HF (bpm)",
+        filename="heartrate",
+        title="HF (bpm)"
+    ),
+    PlottableParameter(
+        column_name="Af (1/min)",
+        filename="respiratory_rate",
+        title="RF (1/min)"
+    ),
+    PlottableParameter(
+        column_name="R (---)",
+        filename="rer",
+        title="Respiratory Rate",
+    ),
+    PlottableParameter(
+        column_name="VE (L/min)",
+        filename="ventilation",
+        title="Ventilation",
+        unit="L/min"),
+    # biomechanical parameters
     PlottableParameter(
         column_name="steps_per_minute",
         title="Step Rate",
@@ -150,7 +173,7 @@ plot_params = [
 ]
 
 # pairwise comparisons (T05...T90) from R (emmeans) for the following parameters:
-asterisks = pd.read_excel(get_path_data_root().joinpath("results_pwc.xlsx"), index_col=0)
+asterisks = pd.read_excel(get_path_data_root().joinpath("results_pwc_shoe.xlsx"), index_col=0)
 
 
 def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
@@ -181,17 +204,19 @@ def line_plot_for_param(data: pd.DataFrame, param: PlottableParameter):
     return fig
 
 
-def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_participants: bool = False) -> plt.Figure:
+def violin_plot_for_param(data: pd.DataFrame,
+                          param: PlottableParameter,
+                          plot_participants: bool = False,
+                          show_title: bool = False) -> plt.Figure:
     data = data.copy()
-    # only return those rows there the column_name is not NaN
-    data = data.dropna(subset=[param.column_name])
+    # only return those rows there the column_name is not NaN and where time_min is greater or equal to 15
+    data = data.dropna(subset=[param.column_name]).query("time_min >= 15")
     # Replace missing time_condition values and force string type
     data["time_condition"] = data["time_condition"].fillna("").astype(str)
 
-
-    if 'T01' in data["time_condition"].unique():
-        time_order = ['T01', 'T03', 'T05', 'T07', 'T10', 'T15', 'T30', 'T45', 'T60', 'T75', 'T90']
-        data["time_condition"] = pd.Categorical(data["time_condition"], categories=time_order, ordered=True)
+    # if 'T01' in data["time_condition"].unique():
+    #     time_order = ['T01', 'T03', 'T05', 'T07', 'T10', 'T15', 'T30', 'T45', 'T60', 'T75', 'T90']
+    #     data["time_condition"] = pd.Categorical(data["time_condition"], categories=time_order, ordered=True)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     markers = {"AFT": "s", "NonAFT": "D"}
@@ -267,12 +292,23 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
         print(e)
         if param.column_name == "VO2/Kg (mL/min/Kg)":
             asterisks_param = asterisks.loc["VO2_Kg__mL_min_Kg_"]
+        elif param.column_name == "HF (bpm)":
+            asterisks_param = asterisks.loc["HF__bpm_"]
+        elif param.column_name == "Af (1/min)":
+            asterisks_param = asterisks.loc["Af__1_min_"]
+        elif param.column_name == "R (---)":
+            asterisks_param = asterisks.loc["R______"]
+        elif param.column_name == "VE (L/min)":
+            asterisks_param = asterisks.loc["VE__L_min_"]
         else:
-
+            print('Parameter Column Name Mistmatch!')
             foo = 1
-    if len(ax.get_xticks()) == 8:
-        asterisks_param.drop(["p_T01", "p_T03", "p_T07"], inplace=True)
-    asterisks_param = list(asterisks_param.apply(lambda x: "*" if x == "<0.001" else "").values)
+    # if len(ax.get_xticks()) == 8:
+    #     asterisks_param.drop(["p_T01", "p_T03", "p_T07"], inplace=True)
+    # elif len(ax.get_xticks()) == 6:
+    #     asterisks_param.drop(["p_T01", "p_T03", "p_T05", "p_T07", "p_T10"], inplace=True)
+    asterisks_param = list(asterisks_param.apply(lambda x: "*" if x <= 0.05 else "").values)
+    assert (len(asterisks_param) == len(ax.get_xticks()))
     if asterisks_param is not None:
         xticks = ax.get_xticks()  # numeric positions for each category
         # Get sorted unique time_condition labels in order of appearance on the axis
@@ -293,7 +329,13 @@ def violin_plot_for_param(data: pd.DataFrame, param: PlottableParameter, plot_pa
     # Set labels and title
     ax.set_xlabel("Time (min)")
     ax.set_ylabel(param.unit if param.unit else param.title)
-    fig.suptitle(f"{param.title}")
+    if show_title:
+        fig.suptitle(f"{param.title}")
+
+    # Adjust x-ticks: replace the T in front of the time condition with an empty string
+    x_ticks = ax.get_xticklabels()
+    x_ticks = [tick.get_text().replace("T", "") for tick in x_ticks]
+    ax.set_xticklabels(x_ticks)
 
     fig.tight_layout()
     return fig
@@ -366,7 +408,12 @@ def make_box_plots(df: pd.DataFrame):
         fig.savefig(path_plot)
 
 
-def make_change_plot(df: pd.DataFrame):
+def make_change_plots(df: pd.DataFrame):
+    make_change_plot(df, param="ocot_change_T15", ylabel="Change in OCOT (%)")
+    make_change_plot(df, param="ecot_change_T15", ylabel="Change in ECOT (%)")
+
+
+def make_change_plot(df: pd.DataFrame, param: str, ylabel: str):
     def add_line_plot(data: pd.DataFrame,
                       param,
                       err_bar_position,
@@ -374,13 +421,7 @@ def make_change_plot(df: pd.DataFrame):
         means = data.groupby("time_min")[param].mean()
         sds = data.groupby("time_min")[param].std()
         mfc = 'k' if marker_fill else 'w'
-        plt.plot(means.index,
-                 means,
-                 color='k',
-                 marker="o",
-                 markerfacecolor=mfc,
-                 markersize=10,
-                 )
+
         yerr = [np.zeros_like(sds), sds] if err_bar_position == 'top' else [sds, np.zeros_like(sds)]
         plt.errorbar(means.index,
                      means,
@@ -388,12 +429,18 @@ def make_change_plot(df: pd.DataFrame):
                      fmt='none',
                      capsize=5,
                      color='k')
+        plt.plot(means.index,
+                 means,
+                 color='k',
+                 marker="o",
+                 markerfacecolor=mfc,
+                 markersize=10,
+                 )
 
     # filter out time points before T15
     df = df[df["time_min"] >= 15]
     data_aft = df[df["shoe_condition"] == "AFT"]
     data_non_aft = df[df["shoe_condition"] == "NonAFT"]
-    param = "ocot_change_T15"
 
     fig, ax = plt.subplots()
     add_line_plot(data_non_aft,
@@ -414,16 +461,152 @@ def make_change_plot(df: pd.DataFrame):
     ax.spines['top'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.tick_params(bottom=False)
-    ax.set_ylabel("Change in oCoT (%)")
+    ax.set_xlabel("Time (min)")
+    ax.set_ylabel(ylabel)
     ax.set_ylim([-2, 10])
+    plt.legend(
+        ["NonAFT", "AFT"],
+        loc='upper left',
+        frameon=False,
+        fontsize=12
+    )
+    fig.savefig(get_plot_path().joinpath(f"{param}.png"))
+
+
+def format_p_value(p_value: float, abbreviate_non_sig: bool = False) -> str:
+    if p_value < 0.001:
+        return "p<0.001"
+    elif abbreviate_non_sig and p_value >= 0.05:
+        return "n.s."
+    return f"p={p_value:.3f}"
+
+
+# def format_p_value(p_value: float, abbreviate_non_sig: bool = True) -> str:
+#     if p_value < 0.05:
+#         return "*"
+#     elif abbreviate_non_sig and p_value >= 0.05:
+#         return "n.s."
+#     return f"p={p_value:.3f}"
+
+
+def make_corr_matrix(df: pd.DataFrame, overlay: str = 'combined'):
+    # Keep relevant columns only
+    df = df[['participant_id',
+             'ecot_J_kg_m',
+             'ocot_mL_kg_km',
+             'VE (L/min)',
+             'R (---)',
+             'HF (bpm)',
+             'lactate',
+             'rpe',
+             'Af (1/min)',
+             'steps_per_minute',
+             'contact_time_ms',
+             'flight_time_ms',
+             'normalized_ground_contact_time',
+             'vertical_pelvis_movement']]
+    df.rename(columns={"normalized_ground_contact_time": "nGCT",
+                       "vertical_pelvis_movement": "pelvis_osc",
+                       "steps_per_minute": "step_rate"
+                       }, inplace=True)
+    # convert participant_id to numeric
+    df["participant_id"] = pd.to_numeric(df["participant_id"].str.replace("DUR", ""))
+    # Rename columns
+    # for var in variables.keys():
+    #     df.rename(columns={var: variables[var]['short']}, inplace=True)
+
+    # Calculate Pearson statistics (correlation coefficients and p-values)
+    corr_matrix = pd.DataFrame(index=df.columns, columns=df.columns)
+    p_values = pd.DataFrame(index=df.columns, columns=df.columns)
+    combined = pd.DataFrame(index=df.columns, columns=df.columns)
+
+    for col1 in df.columns:
+        if col1 == 'participant_id':
+            continue
+        for col2 in df.columns:
+            if col2 == 'participant_id':
+                continue
+            if col1 != col2:
+                df_temp = df[[col1, col2]].dropna()
+                corr, p_value = pearsonr(df_temp[col1], df_temp[col2])
+                rm = pg.rm_corr(
+                    subject='participant_id',
+                    x=col1,
+                    y=col2,
+                    data=df
+                )
+                corr = rm['r'].values[0]
+                p_value = rm['pval'].values[0]
+
+                corr_matrix.loc[col1, col2] = corr
+                p_values.loc[col1, col2] = format_p_value(p_value)
+                # Combine correlation and p-value in a string
+                combined.loc[col1, col2] = f"{corr:.2f}\n{format_p_value(p_value)}"
+            else:
+                corr_matrix.loc[col1, col2] = 1.0
+                p_values.loc[col1, col2] = ""
+                combined.loc[col1, col2] = ""
+
+    # Convert correlation and p-values to numeric for plotting
+    corr_matrix = corr_matrix.astype(float)
+    p_values = p_values.astype(str)
+
+    # Prepare the mask to hide the upper triangle
+    mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)
+
+    # Set up the matplotlib figure
+    f, ax = plt.subplots(figsize=(11, 9))
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['font.size'] = 14
+
+    # Generate a custom diverging colormap
+    cmap = sns.diverging_palette(230, 20, as_cmap=True)
+
+    # Draw the heatmap with the mask and correct aspect ratio, colored by correlation coefficients
+    if overlay == 'combined':
+        overlay_data = combined
+    elif overlay == 'p_values':
+        overlay_data = p_values
+    elif overlay == 'corr_coefficient':
+        overlay_data = corr_matrix
+    else:
+        overlay_data = None
+    # g = sns.heatmap(corr_matrix, mask=mask, cmap=cmap, vmax=1, vmin=-1, center=0,
+    #                 square=True, linewidths=.5, annot=overlay_data, fmt="s", cbar_kws={"shrink": .5})
+    g = sns.heatmap(
+        corr_matrix,
+        mask=mask,
+        cmap=cmap,
+        vmax=1,
+        vmin=-1,
+        center=0,
+        square=True,
+        linewidths=.5,
+        annot=overlay_data,
+        fmt="s",
+        annot_kws={"size": 8},  # <-- set font size for overlay text
+        cbar_kws={"shrink": .5}
+    )
+    g.set_xticklabels(g.get_xmajorticklabels(), fontsize=14)
+    g.set_yticklabels(g.get_ymajorticklabels(), fontsize=14)
+
+    # get everything in the figure frame
+    plt.tight_layout()
+    filename = "correlation_matrix"
+    path_plot = get_plot_path().joinpath(f"{filename}.svg")
+    plt.savefig(path_plot)
+
+    return corr_matrix, p_values
 
 
 def main():
     df = load_merged_dataframe()
     # print(df)
-    make_violin_plots(df, plot_participants=True)
+    make_violin_plots(df, plot_participants=False)
     # make_box_plots(df)
-    # make_change_plot(df)
+    # make_change_plots(df)
+    # make_corr_matrix(df, overlay='combined')
 
 
 if __name__ == '__main__':
